@@ -2,8 +2,10 @@
 A face and gesture recognition security camera, the eye of horus is my Final Year University of Plymouth Project that will account for 40 credits of my grade this year. My supervisor for this project is [Professor Nathan Clark](https://www.plymouth.ac.uk/staff/nathan-clarke).
 
 # Backlog
-Due to university regulations on final year projects, my backlog is recorded on Microsoft Planner. Please click the link below to request access to the planner:
+Due to university regulations on final year projects, my non code backlog is recorded on Microsoft Planner. Please click the link below to request access to the planner:
 https://outlook.office365.com/owa/eyeofhorusPlanner@group.plymouth.ac.uk/groupsubscription.ashx?action=join&source=MSExchange/LokiServer&guid=a322b80f-c38a-44dd-b956-e9b43f82ec87
+
+Code related tasks will be recorded on the [GitHub Project Board](https://github.com/M-Davies/eye-of-horus/projects/1) to allow for greater automation and drawing of references between tasks.
 
 # Project Vision
 **For:** Users looking to protect their assets within safes or rooms and need a more reliable and secure solution than an easily stolen key or forgetful passphrase.
