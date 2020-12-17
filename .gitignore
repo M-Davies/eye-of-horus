@@ -1,2 +1,4 @@
 .env
 **/.DS_Store
+testing/personalNotes.md
+**/__pycache__/**
