@@ -2,8 +2,6 @@
 
 **[OtherExploredSoloutions/](OtherExploredSoloutions/) contains my tinkering with the [face_recognition](https://github.com/ageitgey/face_recognition) python lib and is seperate to what I will discussing here.**
 
-**For more information, please see [testing/README.md](../README.md)**
-
 My notes and investigations into creating a streamed, rekognition cloud service using the AWS CLI SDK. This was done for testing and experimetation purposes, with the final product's interaction with AWS being done using the Python SDK (see [scripts/](../../scripts)).
 
 ARN's and other sensetive info has been omitted but you can generally observe how I constructed the service, following these guides in order:
@@ -87,7 +85,7 @@ Start streaming to Kinesis and begin rekognition.
 gst-launch-1.0 avfvideosrc device-index=0 ! videoconvert ! video/x-raw,format=I420,width=1280,height=720,framerate=20/1 ! x264enc bframes=0 key-int-max=45 bitrate=500 ! video/x-h264,stream-format=avc,alignment=au,profile=baseline ! kvssink stream-name="CameraVideoStream" storage-size=512 access-key="access-key" secret-key="access-key-secret" aws-region="eu-west-1"
 ```
 
-### CUTS DOWN LATENCY
+### Cuts down latency
 
 RESULT = Cuts it by about 2-5 seconds
 
