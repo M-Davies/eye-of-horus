@@ -16,18 +16,51 @@ import sys
 sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
 
-def add_face_to_collection(imagePath, objectName=None):
+client = boto3.client('rekognition')
+
+def remove_face_from_collection(imagePath):
+    """remove_face_from_collection() : Removes a face from the rekognition collection.
+    :param imagePath: External image id to be deleted
+    """
+
+    # Verify face exists in collection
+    faces = client.list_faces(
+        CollectionId = commons.FACE_RECOG_COLLECTION,
+    )
+
+    foundFace = False
+    for face in faces["Faces"]:
+        if imagePath == face["ExternalImageId"]:
+            print(f"[INFO] {imagePath} found with object name {imagePath} : {face['FaceId']}. Face to be deleted:\n{face}")
+            foundFace = face['FaceId']
+            break
+
+    if foundFace == False:
+        commons.throw("ERROR", f"No face found in collection with object name {imagePath}", 3)
+
+    # Delete Object
+    deletedResponse = client.delete_faces(
+        CollectionId = commons.FACE_RECOG_COLLECTION,
+        FaceIds = [foundFace]
+    )
+
+    # Verify face was deleted
+    if deletedResponse["DeletedFaces"][0] != foundFace:
+        commons.throw("ERROR", f"Failed to delete face with id {foundFace}. Face ID {deletedResponse['DeletedFaces'][0]} was deleted instead.", 1)
+
+    print(f"[SUCCESS] {imagePath} was successfully removed from {commons.FACE_RECOG_COLLECTION}!")
+
+def add_face_to_collection(imagePath, s3Name=None):
     """add_face_to_collection() : Retrieves an image and indexes it to a rekognition collection, ready for examination.
     :param imagePath: Path to file to be uploaded
     :param objectName: S3 object name and or path. If not specified then file_name is used
     """
 
-    client = boto3.client('rekognition')
-
     # If an objectName was not specified, use file_name
-    if objectName is None:
+    if s3Name is None:
         objectName = commons.parseObjectName(imagePath)
-
+    else:
+        objectName = commons.parseImageObject(s3Name)
 
     # Check if we're using a local file
     if os.path.isfile(imagePath):
@@ -72,13 +105,24 @@ def add_face_to_collection(imagePath, objectName=None):
 # START #
 #########
 def main(argv):
-    """main() : Main method that parses the input opts and returns the result from add_faces_to_collection()"""
+    """main() : Main method that parses the input opts and returns the result"""
 
     # Parse input parameters
     argumentParser = argparse.ArgumentParser(description="Adds a face from S3 or local drive to a rekognition collection")
+    argumentParser.add_argument("-a", "--action",
+        required=True,
+        choices=["add", "delete"],
+        help="""Action to be conducted on the --file. Only one action can be performed at one time:
+
+        add - Adds the --file to the collection. --name can optionally be added if the name of the --file is not what it should be in S3. |
+        delete - Deletes the --file inside the collection. |
+
+        Note: There is no edit/rename action as collections don't support image renaming or deletion. If you wish to rename an image, delete the original and create a new one.
+        """
+    )
     argumentParser.add_argument("-f", "--file",
         required=True,
-        help="Full path to a jpg or png image file (s3 or local) to be added to the rekognition collection"
+        help="Full path to a jpg or png image file (s3 or local)"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -86,7 +130,10 @@ def main(argv):
     )
     argDict = argumentParser.parse_args()
 
-    indexed_faces_count = add_face_to_collection(argDict.file, argDict.name)
+    if argDict.action == "delete":
+        remove_face_from_collection(argDict.file)
+    else:
+        add_face_to_collection(argDict.file, argDict.name)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

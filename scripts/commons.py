@@ -41,5 +41,19 @@ def parseObjectName(fileName):
     objectName = fileName
     if "/" in fileName:
         objectName = fileName.split("/")[-1]
+
+    objectName = parseImageObject(objectName)
+
     return objectName
+
+def parseImageObject(objectName):
+    """parseImageObject() : Ensures that an object name is an image and appends jpg if it isn't
+    :param objectName: Objectname to be checked and modified
+    :return: The new objectName
+    """
+
+    if "jpg" not in objectName and "png" not in objectName:
+        return f"{objectName}.jpg"
+    else:
+        return objectName
 
