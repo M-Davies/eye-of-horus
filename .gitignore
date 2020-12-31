@@ -24,6 +24,7 @@ testing/personalNotes.md
 .env.test.local
 .env.production.local
 .eslintcache
+.vscode/settings.json
 
 npm-debug.log*
 yarn-debug.log*
