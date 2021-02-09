@@ -1,7 +1,7 @@
 # -----------------------------------------------------------
 # Uploads an image containing a face to S3
 #
-# Copyright (c) 2020 Morgan Davies, UK
+# Copyright (c) 2021 Morgan Davies, UK
 # Released under MIT License
 # -----------------------------------------------------------
 
@@ -13,8 +13,9 @@ import os
 from PIL import Image
 
 import sys
-import index_photo
 sys.path.append(os.path.dirname(__file__) + "/..")
+import index_photo
+import compare_faces
 import commons
 
 client = boto3.client('s3')
@@ -78,16 +79,14 @@ def main(argv):
     """main() : Main method that parses the input opts and returns the result"""
 
     # Parse input parameters
-    argumentParser = argparse.ArgumentParser(description="S3 image manager. Allows for the creation or deletion of images inside S3.")
+    argumentParser = argparse.ArgumentParser(
+        description="S3 image manager. Allows for the creation or deletion of images inside S3.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     argumentParser.add_argument("-a", "--action",
         required=True,
         choices=["create", "delete"],
-        help="""Action to be conducted on the --file. Only one action can be performed at one time:
-
-        create - Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3. |
-        delete - Deletes the --file inside S3. |
-
-        Note: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
+        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--file",
@@ -102,6 +101,11 @@ def main(argv):
         required=False,
         action="store_true",
         help="Index the image to the rekognition collection as soon as it's been uploaded"
+    )
+    argumentParser.add_argument("-c", "--compare",
+        required=False,
+        action="store_true",
+        help="Run the comparison library to instantly check the stream for any user faces"
     )
     argDict = argumentParser.parse_args()
 
@@ -144,6 +148,11 @@ def main(argv):
 
     else:
         commons.throw("ERROR", f"Invalid action type - {argDict.action}", 2)
+
+    # Run comparison on stream
+    if argDict.compare == True:
+        print("[INFO] Running comparison library to check for user faces in current stream...")
+        compare_faces.checkForFaces()
 
 if __name__ == "__main__":
     main(sys.argv[1:])

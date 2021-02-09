@@ -1,7 +1,7 @@
 # -----------------------------------------------------------
 # Retrieves a photo from S3 or locally and adds it to a Rekognition Collection
 #
-# Copyright (c) 2020 Morgan Davies, UK
+# Copyright (c) 2021 Morgan Davies, UK
 # Released under MIT License
 # -----------------------------------------------------------
 
@@ -97,7 +97,7 @@ def add_face_to_collection(imagePath, s3Name=None):
             DetectionAttributes = ['ALL']
         )
 
-    print(f"[SUCCESS] Face successfully indexed! Dumping metadata and exiting...")
+    print(f"[SUCCESS] Face successfully indexed! Dumping metadata...")
     for faceRecord in response['FaceRecords']:
          print(json.dumps(faceRecord, indent=2))
 
@@ -108,16 +108,14 @@ def main(argv):
     """main() : Main method that parses the input opts and returns the result"""
 
     # Parse input parameters
-    argumentParser = argparse.ArgumentParser(description="Adds a face from S3 or local drive to a rekognition collection")
+    argumentParser = argparse.ArgumentParser(
+        description="Adds a face from S3 or local drive to a rekognition collection",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     argumentParser.add_argument("-a", "--action",
         required=True,
         choices=["add", "delete"],
-        help="""Action to be conducted on the --file. Only one action can be performed at one time:
-
-        add - Adds the --file to the collection. --name can optionally be added if the name of the --file is not what it should be in S3. |
-        delete - Deletes the --file inside the collection. |
-
-        Note: There is no edit/rename action as collections don't support image renaming or deletion. If you wish to rename an image, delete the original and create a new one.
+        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\nadd: Adds the --file to the collection. --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside the collection.\n\nNote: There is no edit/rename action as collections don't support image renaming or deletion. If you wish to rename an image, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--file",

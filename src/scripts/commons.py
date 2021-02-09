@@ -13,11 +13,16 @@
 # 3 - Something wasn't found or is invalid
 #############################################
 
+from dotenv import load_dotenv
 import sys
+import os
 
 # GLOBAL VARIABLES USED BY ALL SCRIPTS
 FACE_RECOG_BUCKET = "eye-of-horus-bucket"
 FACE_RECOG_COLLECTION = "RekognitionCollection"
+FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
+CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
+CAMERA_STREAM_NAME = "CameraVideoStream"
 
 THROWABLE_ERRORS = ["ERROR", "EXCEPTION"]
 
