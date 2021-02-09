@@ -16,13 +16,17 @@ load_dotenv()
 import os
 import argparse
 import json
+import base64
 
 import sys
 sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
+import time
 
 def createProcessor():
-    """createProcessor() : Creates a stream processor.
+    """
+    createProcessor() : Creates a stream processor.
+
     We assume that the kinesis video and data streams have already been created using the console.
     The default FaceMatchThreshold has been increased since testing has shown it to be quicker at this level.
     """
@@ -50,6 +54,81 @@ def createProcessor():
     # Once it has been created, this should now pass without a ResourceNotFoundException
     return rekog.describe_stream_processor(Name = commons.FACE_RECOG_PROCESSOR)
 
+def examineFace(streamBytes):
+    """
+    examineFace() : Decode and parse the shard bytes to extract a high matching face object
+
+    :param streamBytes: Data to be decoded and parsed from the paticular shard
+    :return: The matched face object with the highest similarity to the detected face
+    """
+    # Decode bytes
+    decodedJson = base64.b64encode(streamBytes).decode("ascii")
+
+    # NOTE: This will only check one face in the stream. This is intentional as the system gets overly complex and insecure when more than one face is trying to authenticate.
+    matchedFaces = decodedJson["FaceSearchResponse"][0]["MatchedFaces"]
+
+    # If only one matched face was found, use that.
+    if len(matchedFaces) == 1:
+        return matchedFaces[0]
+    # Find the greatest confident face if there is more than one
+    elif len(matchedFaces) > 1:
+        return max(matchedFaces, key = lambda ev: ev["Similarity"])
+    # Just return nothing if no faces were found
+    else:
+        return None
+
+def createShardIterator(shardId):
+    """
+    createShardIterator() : Creates an interator that will allow searching through the shards. This will be called multiple times as shard iterators usually expire after 5mins
+
+    See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kinesis.html#Kinesis.Client.get_shard_iterator
+
+    :param shardId: ID of the shard to create an iterator for
+    :return: The shard iterator ID
+    """
+    return kinesis.get_shard_iterator(
+        StreamName = commons.CAMERA_DATASTREAM_NAME,
+        ShardId = shardId,
+        ShardIteratorType = "LATEST"
+    )["ShardIterator"]
+
+def examineShard(shardJson):
+    """
+    examineShard() : Iterates through the latest shards obtained from the stream, retrieving the matched faces data for each shard
+    :param shardJson: Details of the shard
+    :return: The face that closest matches the detected face in the stream
+    """
+    timeoutCount = 0
+    iterator = createShardIterator(shardJson["ShardId"])
+    faceFound = None
+
+    # TODO: Add some sort of timeout system here so we don't just check forever in the case of no faces being in the stream
+    while faceFound == None:
+        try:
+            # Get data
+            records = kinesis.get_records(
+                ShardIterator = iterator
+            )["Records"]
+
+            # If records array empty, stream is not running
+            if records == []:
+                commons.throw("ERROR", f"No records were found in shard {shardJson['ShardId']}", 3)
+
+            # Iterate through data records and see if there is a matching face. If there is, break loop
+            for record in records:
+                faceFound = examineFace(record["Data"])
+
+        # API is being spammed. Sleep to let it recover
+        except kinesis.exceptions.ProvisionedThroughputExceededException:
+            commons.throw("WARNING", "Exceeded AWS API limit for get-records. Sleeping and trying again...")
+            time.sleep(0.5)
+        # Shard Iterator has expired.
+        except kinesis.exceptions.ExpiredIteratorException:
+            commons.throw("WARNING", "Shard iterator has expired. Recreating...")
+            iterator = createShardIterator(shardJson["ShardId"])
+
+    return faceFound
+
 #########
 # START #
 #########
@@ -73,10 +152,22 @@ def checkForFaces():
         )
     else:
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} is already running!")
-    
-    
 
+    # Get latest shards
+    shards = kinesis.list_shards(
+        StreamName = commons.CAMERA_DATASTREAM_NAME,
+        ShardFilter = {
+            "Type": "AT_LATEST"
+        }
+    )["Shards"]
 
+    # Iterate through the shards
+    for shard in shards:
+        matchedFace = examineShard(shard)
 
+        # FIXME: There must be a better way of checking if we've found a face or not twice
+        if matchedFace != None:
+            break
 
-
+    # Send feedback of matched face
+    print(f"[SUCCESS] Found a matching face!\n{matchedFace}")

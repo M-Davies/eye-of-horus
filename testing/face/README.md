@@ -105,6 +105,12 @@ List all the [shards](https://docs.aws.amazon.com/streams/latest/dev/key-concept
 aws kinesis list-shards --stream-name AmazonRekognitionCameraDataStream --shard-filter '{"Type":"AT_LATEST"}'
 ```
 
+*alternatively, this produces the same results except it doesn't allow you to specify the latest...*
+
+```bash
+aws kinesis describe-stream --stream-name AmazonRekognitionCameraDataStream
+```
+
 We can then iterate through the JSON, creating a shard iterator for each shard-id, allowing us to retrieve the records:
 
 ### Create a shard iterator and read results
@@ -121,6 +127,8 @@ SHARD_ITERATOR=$(aws kinesis get-shard-iterator --shard-id [shard_id_from_list-s
 ```
 
 #### Latest
+
+If the stream isn't running, the get-records will return no records for this and the NextShardIterator will just keep returning no records over and over again.
 
 ```bash
 SHARD_ITERATOR=$(aws kinesis get-shard-iterator --shard-id [shard_id_from_list-shards] --shard-iterator-type LATEST --stream-name AmazonRekognitionCameraDataStream --query 'ShardIterator')
