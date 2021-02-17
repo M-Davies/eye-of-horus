@@ -54,18 +54,20 @@ def createProcessor():
     # Once it has been created, this should now pass without a ResourceNotFoundException
     return rekog.describe_stream_processor(Name = commons.FACE_RECOG_PROCESSOR)
 
-def examineFace(streamBytes):
+def examineFace(record):
     """
     examineFace() : Decode and parse the shard bytes to extract a high matching face object
 
-    :param streamBytes: Data to be decoded and parsed from the paticular shard
+    :param record: Shard containing frames and fragment numbers
     :return: The matched face object with the highest similarity to the detected face
     """
-    # Decode bytes
-    decodedJson = base64.b64encode(streamBytes).decode("ascii")
-
     # NOTE: This will only check one face in the stream. This is intentional as the system gets overly complex and insecure when more than one face is trying to authenticate.
-    matchedFaces = decodedJson["FaceSearchResponse"][0]["MatchedFaces"]
+    jsonData = json.loads(record["Data"])
+    matchedFaces = None
+    try:
+        matchedFaces = jsonData["FaceSearchResponse"][0]["MatchedFaces"]
+    except IndexError:
+        return matchedFaces
 
     # If only one matched face was found, use that.
     if len(matchedFaces) == 1:
@@ -98,25 +100,29 @@ def examineShard(shardJson):
     :param shardJson: Details of the shard
     :return: The face that closest matches the detected face in the stream
     """
-    timeoutCount = 0
     iterator = createShardIterator(shardJson["ShardId"])
     faceFound = None
 
-    # TODO: Add some sort of timeout system here so we don't just check forever in the case of no faces being in the stream
     while faceFound == None:
         try:
             # Get data
             records = kinesis.get_records(
                 ShardIterator = iterator
-            )["Records"]
+            )
+            print(f"[INFO] Found records:\n{records}")
 
-            # If records array empty, stream is not running
-            if records == []:
-                commons.throw("ERROR", f"No records were found in shard {shardJson['ShardId']}", 3)
+            # If records array empty, try adjacent shard and iterate until timeout expires or face is found
+            if records["Records"] == []:
+                commons.throw("WARNING", f"No records were found in shard {shardJson['ShardId']}. Trying the next shard with iterator {records['NextShardIterator']}")
+                iterator = records['NextShardIterator']
+                continue
+            else:
+                # Iterate through data records and see if there is a matching face. If there is, break loop
+                for record in records["Records"]:
+                    faceFound = examineFace(record)
 
-            # Iterate through data records and see if there is a matching face. If there is, break loop
-            for record in records:
-                faceFound = examineFace(record["Data"])
+                    if faceFound != None:
+                        break
 
         # API is being spammed. Sleep to let it recover
         except kinesis.exceptions.ProvisionedThroughputExceededException:
@@ -140,10 +146,11 @@ def checkForFaces():
         processor = rekog.describe_stream_processor(
             Name = commons.FACE_RECOG_PROCESSOR
         )
+        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} already exists")
     except rekog.exceptions.ResourceNotFoundException:
         commons.throw("WARNING", f"{commons.FACE_RECOG_PROCESSOR} does not appear to exist. Creating now")
         processor = createProcessor()
-    print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
+        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
 
     if processor["Status"] != "RUNNING":
         print(f"[INFO] Starting Rekognition Stream Processor {commons.FACE_RECOG_PROCESSOR}...")
@@ -151,7 +158,7 @@ def checkForFaces():
             Name = commons.FACE_RECOG_PROCESSOR
         )
     else:
-        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} is already running!")
+        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} is already running")
 
     # Get latest shards
     shards = kinesis.list_shards(
@@ -162,6 +169,7 @@ def checkForFaces():
     )["Shards"]
 
     # Iterate through the shards
+    # NOTE: might not be needed as the stream only serves a max of one shard
     for shard in shards:
         matchedFace = examineShard(shard)
 
@@ -169,5 +177,8 @@ def checkForFaces():
         if matchedFace != None:
             break
 
-    # Send feedback of matched face
-    print(f"[SUCCESS] Found a matching face!\n{matchedFace}")
+    # Send feedback of matched face or error if the stream is not running/no faces found
+    if matchedFace == None:
+        print(f"[SUCCESS] No matching faces were found in the stream!")
+    else:
+        print(f"[SUCCESS] Found a matching face!\n{matchedFace}")

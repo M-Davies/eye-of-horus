@@ -13,7 +13,6 @@ import sys
 import datetime
 sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
-import run_gesture_recog
 
 #########
 # START #

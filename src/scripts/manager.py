@@ -8,14 +8,16 @@
 import boto3
 from botocore.exceptions import ClientError
 
+import sys
 import argparse
 import os
+import time
+import subprocess
 from PIL import Image
 
-import sys
-sys.path.append(os.path.dirname(__file__) + "/..")
-import index_photo
-import compare_faces
+from face import index_photo
+from face import compare_faces
+from gesture import gather_fragments
 import commons
 
 client = boto3.client('s3')
@@ -85,12 +87,12 @@ def main(argv):
     )
     argumentParser.add_argument("-a", "--action",
         required=True,
-        choices=["create", "delete"],
-        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
+        choices=["create", "delete", "compare"],
+        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\ncompare: Executes the comparison library against ALL users in the database.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--file",
-        required=True,
+        required=False,
         help="Full path to jpg or png image file to be manipulated in this operation."
     )
     argumentParser.add_argument("-n", "--name",
@@ -102,12 +104,9 @@ def main(argv):
         action="store_true",
         help="Index the image to the rekognition collection as soon as it's been uploaded"
     )
-    argumentParser.add_argument("-c", "--compare",
-        required=False,
-        action="store_true",
-        help="Run the comparison library to instantly check the stream for any user faces"
-    )
     argDict = argumentParser.parse_args()
+    print("[INFO] Parsed arguments:")
+    print(argDict)
 
     # Ensure that the file to be uploaded is an existing photo
     if argDict.action == "create":
@@ -146,13 +145,34 @@ def main(argv):
 
         delete_file(s3FilePath)
 
+    # Run comparison on stream
+    elif argDict.action == "compare":
+        print("[INFO] Running comparison library to check for user faces in current stream...")
+
+        try:
+            # Boot up live stream
+            startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
+            if startStreamRet != 0:
+                commons.throw("ERROR", "Stream failed to start, see log for details", startStreamRet)
+            else:
+                # We have to sleep for a bit here as the steam takes ~5s to boot
+                time.sleep(3)
+
+            # Start comparing, timing out after 30 seconds of scanning
+            try:
+                return subprocess.call(compare_faces.checkForFaces(), timeout=30)
+            except TypeError:
+                # Pass here to avoid a TypeError: 'NoneType' object is not iterable (likely caused by starting from main())
+                pass
+
+        except subprocess.TimeoutExpired as e:
+            print(f"[ERROR] TIMEOUT FIRED! Exiting stream...\n{e}")
+        finally:
+            # Terminate streaming
+            subprocess.call("./stopStream.sh")
+
     else:
         commons.throw("ERROR", f"Invalid action type - {argDict.action}", 2)
-
-    # Run comparison on stream
-    if argDict.compare == True:
-        print("[INFO] Running comparison library to check for user faces in current stream...")
-        compare_faces.checkForFaces()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
