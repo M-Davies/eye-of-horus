@@ -1,9 +1,6 @@
 # Testing face_recognition.py
 
-## Running
-
-[FaceTesting/](FaceTesting/) is testing the [facial recognition python library.](https://github.com/ageitgey/face_recognition)
-To run, follow the installation instructions in the repository and install OpenCV via `pip` or `brew`. Finally, run `face_recog_test.py` using python3.
+https://github.com/ageitgey/face_recognition
 
 ## Feedback
 

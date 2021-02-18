@@ -1,6 +1,6 @@
 # Notes
 
-**[OtherExploredSoloutions/](OtherExploredSoloutions/) contains my tinkering with the [face_recognition](https://github.com/ageitgey/face_recognition) python lib and is seperate to what I will discussing here.**
+**[OtherFaceSoloutions.md](OtherFaceSoloutions.md) contains my tinkering with the [face_recognition](https://github.com/ageitgey/face_recognition) python lib and is seperate to what I will discussing here.**
 
 My notes and investigations into creating a streamed, rekognition cloud service using the AWS CLI SDK. This was done for testing and experimetation purposes, with the final product's interaction with AWS being done using the Python SDK (see [scripts/](../../scripts)).
 
