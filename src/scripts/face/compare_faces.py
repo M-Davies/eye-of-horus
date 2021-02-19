@@ -9,6 +9,7 @@ import boto3
 rekog = boto3.client("rekognition")
 kinesis = boto3.client("kinesis")
 knVideo = boto3.client("kinesisvideo")
+import botocore
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -105,10 +106,15 @@ def examineShard(shardJson):
 
     while faceFound == None:
         try:
-            # Get data
-            records = kinesis.get_records(
-                ShardIterator = iterator
-            )
+            # Get data from stream using the created iterator
+            try:
+                records = kinesis.get_records(
+                    ShardIterator = iterator
+                )
+            except botocore.exceptions.HTTPClientError:
+                # Special case as when the signal handler cancels the script during a get records, it will raise this exception
+                raise TimeoutError
+
             print(f"[INFO] Found records:\n{records}")
 
             # If records array empty, try adjacent shard and iterate until timeout expires or face is found
@@ -173,12 +179,7 @@ def checkForFaces():
     for shard in shards:
         matchedFace = examineShard(shard)
 
-        # FIXME: There must be a better way of checking if we've found a face or not twice
-        if matchedFace != None:
-            break
+    # We will always return a successfull face or will be forcibly aborted by the manager timeout
+    print(f"[SUCCESS] Found a matching face!\n{matchedFace}")
+    return matchedFace
 
-    # Send feedback of matched face or error if the stream is not running/no faces found
-    if matchedFace == None:
-        print(f"[SUCCESS] No matching faces were found in the stream!")
-    else:
-        print(f"[SUCCESS] Found a matching face!\n{matchedFace}")

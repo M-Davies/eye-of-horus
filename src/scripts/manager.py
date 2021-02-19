@@ -13,6 +13,7 @@ import argparse
 import os
 import time
 import subprocess
+import signal
 from PIL import Image
 
 from face import index_photo
@@ -74,6 +75,13 @@ def upload_file(fileName, s3Name=None):
 
     return objectName
 
+def timeoutHandler(signum, stackFrame):
+    """timeoutHandler() : Raises a TimeoutError when the signal alarm goes off.
+    :param signum: Signal handler caller number
+    :param stackFrame: Current stack frame object where it was aborted
+    """
+    raise TimeoutError
+
 #########
 # START #
 #########
@@ -103,6 +111,12 @@ def main(argv):
         required=False,
         action="store_true",
         help="Index the image to the rekognition collection as soon as it's been uploaded"
+    )
+    timeoutSeconds = 20
+    argumentParser.add_argument("-t", "--timeout",
+        required=False,
+        type=int,
+        help=f"Timeout (in seconds) for the stream to timeout after not finding a face during comparison\nUsed with -a compare, default is {timeoutSeconds}"
     )
     argDict = argumentParser.parse_args()
     print("[INFO] Parsed arguments:")
@@ -147,8 +161,10 @@ def main(argv):
 
     # Run comparison on stream
     elif argDict.action == "compare":
-        print("[INFO] Running comparison library to check for user faces in current stream...")
+        if argDict.timeout != None:
+            timeoutSeconds = argDict.timeout
 
+        print(f"[INFO] Running comparison library to check for user faces in current stream (timing out after {timeoutSeconds}s)...")
         try:
             # Boot up live stream
             startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
@@ -158,17 +174,21 @@ def main(argv):
                 # We have to sleep for a bit here as the steam takes ~5s to boot
                 time.sleep(3)
 
-            # Start comparing, timing out after 30 seconds of scanning
+            # Start comparing, timing out if no face is found within the limit
             try:
-                return subprocess.call(compare_faces.checkForFaces(), timeout=30)
-            except TypeError:
-                # Pass here to avoid a TypeError: 'NoneType' object is not iterable (likely caused by starting from main())
-                pass
+                signal.signal(signal.SIGALRM, timeoutHandler)
+                signal.alarm(timeoutSeconds)
+                matchedFace = compare_faces.checkForFaces()
 
-        except subprocess.TimeoutExpired as e:
-            print(f"[ERROR] TIMEOUT FIRED! Exiting stream...\n{e}")
+                # By this point, we have found a face so cancel the timeout and return the matched face
+                signal.alarm(0)
+                return matchedFace
+            except TimeoutError:
+                signal.signal(signal.SIGALRM, signal.SIG_DFL)
+                commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 3)
         finally:
-            # Terminate streaming
+            # Terminate streaming and reset signal handler everytime
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
             subprocess.call("./stopStream.sh")
 
     else:
