@@ -8,6 +8,7 @@
 import boto3
 from botocore.exceptions import ClientError
 
+import cv2
 import sys
 import argparse
 import os
@@ -18,7 +19,7 @@ from PIL import Image
 
 from face import index_photo
 from face import compare_faces
-from gesture import gather_fragments
+from gesture import gesture_recog
 import commons
 
 client = boto3.client('s3')
@@ -85,7 +86,7 @@ def streamHandler(start):
         if startStreamRet != 0:
             commons.throw("ERROR", "Stream failed to start, see log for details", startStreamRet)
         else:
-            # We have to sleep for a bit here as the steam takes ~5s to boot
+            # We have to sleep for a bit here as the steam takes ~3s to boot
             time.sleep(3)
     else:
         # Terminate streaming and reset signal handler everytime
@@ -114,8 +115,8 @@ def main(argv):
     )
     argumentParser.add_argument("-a", "--action",
         required=True,
-        choices=["create", "delete", "compare"],
-        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\ncompare: Executes the comparison library against ALL users in the database.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
+        choices=["create", "delete", "compare", "gesture"],
+        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\ncompare: Executes the facial comparison library against ALL users in the database.\n\ngesture: Executes the gesture comparison library against the logged in user.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--file",
@@ -135,7 +136,11 @@ def main(argv):
     argumentParser.add_argument("-t", "--timeout",
         required=False,
         type=int,
-        help=f"Timeout (in seconds) for the stream to timeout after not finding a face during comparison\nUsed with -a compare, default is {timeoutSeconds}"
+        help=f"Timeout (in seconds) for the stream to timeout after not finding a face or gesture during comparison\nUsed with -a compare or -a gesture, default is {timeoutSeconds}"
+    )
+    argumentParser.add_argument("-u", "--username",
+        required=False,
+        help="Username to retrieve the gestures from AWS for comparison with the gestures performed on the stream\nUsed with -a gesture"
     )
     argDict = argumentParser.parse_args()
     print("[INFO] Parsed arguments:")
@@ -183,7 +188,7 @@ def main(argv):
         if argDict.timeout != None:
             timeoutSeconds = argDict.timeout
 
-        print(f"[INFO] Running comparison library to check for user faces in current stream (timing out after {timeoutSeconds}s)...")
+        print(f"[INFO] Running facial comparison library to check for user faces in current stream (timing out after {timeoutSeconds}s)...")
 
         # Start/end stream
         streamHandler(True)
@@ -204,6 +209,72 @@ def main(argv):
             # Reset signal handler everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             streamHandler(False)
+
+    # Run gesture recognition lib
+    elif argDict.action == "gesture":
+        if argDict.timeout != None:
+            timeoutSeconds = argDict.timeout
+        else:
+            # Set a higher default timeout for gesture recog as it will take longer
+            timeoutSeconds = 40
+        print(f"[INFO] Running gesture recognition library to check for the correct gestures performed in current stream (timing out after {timeoutSeconds}s)...")
+
+        # Start/end stream
+        streamHandler(True)
+
+        # Retrieve stream's session url endpoint
+        kvClient = boto3.client('kinesisvideo')
+        endpoint = kvClient.get_data_endpoint(
+            StreamName = commons.CAMERA_STREAM_NAME,
+            APIName = "GET_HLS_STREAMING_SESSION_URL"
+        )["DataEndpoint"]
+
+        # Grab the HLS Stream URL from the endpoint
+        kvmClient = boto3.client("kinesis-video-archived-media", endpoint_url = endpoint)
+        try:
+            # Get live stream (only works if stream is active)
+            streamUrl = kvmClient.get_hls_streaming_session_url(
+                StreamName = commons.CAMERA_STREAM_NAME,
+                PlaybackMode = "LIVE"
+            )["HLSStreamingSessionURL"]
+
+        except kvmClient.exceptions.ResourceNotFoundException:
+            commons.throw("ERROR", f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again", 3)
+
+        # Start checking for a matching gesture, timing out if the correct sequence is not found within the limit
+        vcap = cv2.VideoCapture(streamUrl)
+        try:
+            signal.signal(signal.SIGALRM, timeoutHandler)
+            signal.alarm(timeoutSeconds)
+
+            matchedGestures = False
+            while(matchedGestures is False):
+
+                # Capture frame-by-frame
+                ret, frame = vcap.read()
+
+                if ret is not False or frame is not None:
+                    # Run gesture recog lib against captured frame
+                    matchedGestures = gesture_recog.checkForGestures(frame, argDict.username)
+                else:
+                    commons.throw("ERROR", "Stream Interrupted or corrupted! Exiting...", 2)
+                    break
+
+            # By this point, we have found a set of matching gestures so cancel timeout and return access granted
+            signal.alarm(0)
+            print(f"[SUCCESS] Matched gesture combination for user {argDict.username}!")
+
+        except TimeoutError:
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO GESTURES WERE FOUND IN THE STREAM!", 3)
+        finally:
+            # Reset signal handler everytime
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+            streamHandler(False)
+
+            # When everything done, release the capture
+            vcap.release()
+            cv2.destroyAllWindows()
 
     else:
         commons.throw("ERROR", f"Invalid action type - {argDict.action}", 2)
