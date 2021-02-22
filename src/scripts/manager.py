@@ -75,6 +75,25 @@ def upload_file(fileName, s3Name=None):
 
     return objectName
 
+def streamHandler(start):
+    """streamHandler() : Starts the live stream to AWS, contained within a finally block that will execute on function completion.
+    :param start: Boolean denoting whether we are starting or stopping the stream
+    """
+    if start:
+        # Boot up live stream
+        startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
+        if startStreamRet != 0:
+            commons.throw("ERROR", "Stream failed to start, see log for details", startStreamRet)
+        else:
+            # We have to sleep for a bit here as the steam takes ~5s to boot
+            time.sleep(3)
+    else:
+        # Terminate streaming and reset signal handler everytime
+        stopStreamRet = subprocess.call("./stopStream.sh")
+
+        if stopStreamRet != 0:
+            commons.throw("ERROR", "Stream failed to die, see log for details", stopStreamRet)
+
 def timeoutHandler(signum, stackFrame):
     """timeoutHandler() : Raises a TimeoutError when the signal alarm goes off.
     :param signum: Signal handler caller number
@@ -165,31 +184,26 @@ def main(argv):
             timeoutSeconds = argDict.timeout
 
         print(f"[INFO] Running comparison library to check for user faces in current stream (timing out after {timeoutSeconds}s)...")
+
+        # Start/end stream
+        streamHandler(True)
+
+        # Start comparing, timing out if no face is found within the limit
         try:
-            # Boot up live stream
-            startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
-            if startStreamRet != 0:
-                commons.throw("ERROR", "Stream failed to start, see log for details", startStreamRet)
-            else:
-                # We have to sleep for a bit here as the steam takes ~5s to boot
-                time.sleep(3)
+            signal.signal(signal.SIGALRM, timeoutHandler)
+            signal.alarm(timeoutSeconds)
+            matchedFace = compare_faces.checkForFaces()
 
-            # Start comparing, timing out if no face is found within the limit
-            try:
-                signal.signal(signal.SIGALRM, timeoutHandler)
-                signal.alarm(timeoutSeconds)
-                matchedFace = compare_faces.checkForFaces()
-
-                # By this point, we have found a face so cancel the timeout and return the matched face
-                signal.alarm(0)
-                return matchedFace
-            except TimeoutError:
-                signal.signal(signal.SIGALRM, signal.SIG_DFL)
-                commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 3)
-        finally:
-            # Terminate streaming and reset signal handler everytime
+            # By this point, we have found a face so cancel the timeout and return the matched face
+            signal.alarm(0)
+            return matchedFace
+        except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            subprocess.call("./stopStream.sh")
+            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 3)
+        finally:
+            # Reset signal handler everytime
+            signal.signal(signal.SIGALRM, signal.SIG_DFL)
+            streamHandler(False)
 
     else:
         commons.throw("ERROR", f"Invalid action type - {argDict.action}", 2)
