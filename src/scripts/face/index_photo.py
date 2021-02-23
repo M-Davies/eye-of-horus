@@ -36,7 +36,7 @@ def remove_face_from_collection(imagePath):
             break
 
     if foundFace == False:
-        commons.throw("ERROR", f"No face found in collection with object name {imagePath}", 3)
+        commons.throw("ERROR", f"No face found in collection with object name {imagePath}", 2)
 
     # Delete Object
     deletedResponse = client.delete_faces(
@@ -46,7 +46,7 @@ def remove_face_from_collection(imagePath):
 
     # Verify face was deleted
     if deletedResponse["DeletedFaces"][0] != foundFace:
-        commons.throw("ERROR", f"Failed to delete face with id {foundFace}. Face ID {deletedResponse['DeletedFaces'][0]} was deleted instead.", 1)
+        commons.throw("ERROR", f"Failed to delete face with id {foundFace}. Face ID {deletedResponse['DeletedFaces'][0]} was deleted instead.", 4)
 
     print(f"[SUCCESS] {imagePath} was successfully removed from {commons.FACE_RECOG_COLLECTION}!")
 
@@ -67,7 +67,7 @@ def add_face_to_collection(imagePath, s3Name=None):
         try:
             Image.open(imagePath)
         except IOError:
-            commons.throw("ERROR", f"File {imagePath} exists but is not an image. Only jpg and png files are valid", 1)
+            commons.throw("ERROR", f"File {imagePath} exists but is not an image. Only jpg and png files are valid", 7)
 
         with open(imagePath, "rb") as fileBytes:
             print(f"[INFO] Indexing local image {imagePath} with collection object name {objectName}")

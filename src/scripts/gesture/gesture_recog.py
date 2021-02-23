@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
 
 def checkForGestures(frame, username):
+    pass
 
 def main(argv):
     """main() : Main method that parses the input opts and returns the result"""
@@ -39,10 +40,13 @@ def main(argv):
         try:
             Image.open(argDict.file)
         except IOError:
-            commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 1)
+            commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 7)
+        checkForGestures(argDict.file, argDict.username)
     else:
         # Use an S3 object if no file was found at the image path given
         commons.throw("WARNING", f"{argDict.file} does not exist as a local file. Attempting to retrieve the image using the same path from S3...")
+
+        # TODO: Either download the image or pass the link to custom labels
 
 if __name__ == "__main__":
     main(sys.argv[1:])

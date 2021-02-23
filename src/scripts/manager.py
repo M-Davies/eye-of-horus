@@ -41,7 +41,7 @@ def delete_file(fileName):
             Key = fileName
         )
 
-        commons.throw("ERROR", f"Failed to delete {fileName}. Deletion response:\n{deletionRequest}", 2)
+        commons.throw("ERROR", f"Failed to delete {fileName}. Deletion response:\n{deletionRequest}", 4)
     except client.exceptions.NoSuchKey:
         print(f"[SUCCESS] {fileName} has been successfully deleted from S3!")
 
@@ -70,7 +70,7 @@ def upload_file(fileName, s3Name=None):
                 Key = objectName
             )
     except ClientError as e:
-        commons.throw("ERROR", f"{fileName} FAILED to upload to S3\n{e}", 1)
+        commons.throw("ERROR", f"{fileName} FAILED to upload to S3\n{e}", 3)
 
     print(f"[SUCCESS] {objectName} has been uploaded to {commons.FACE_RECOG_BUCKET}")
 
@@ -84,7 +84,7 @@ def streamHandler(start):
         # Boot up live stream
         startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
         if startStreamRet != 0:
-            commons.throw("ERROR", "Stream failed to start, see log for details", startStreamRet)
+            commons.throw("ERROR", f"Stream failed to start (error code {startStreamRet}), see log for details", 5)
         else:
             # We have to sleep for a bit here as the steam takes ~3s to boot
             time.sleep(3)
@@ -93,7 +93,7 @@ def streamHandler(start):
         stopStreamRet = subprocess.call("./stopStream.sh")
 
         if stopStreamRet != 0:
-            commons.throw("ERROR", "Stream failed to die, see log for details", stopStreamRet)
+            commons.throw("ERROR", f"Stream failed to die (error code {stopStreamRet}), see log for details", 6)
 
 def timeoutHandler(signum, stackFrame):
     """timeoutHandler() : Raises a TimeoutError when the signal alarm goes off.
@@ -152,9 +152,9 @@ def main(argv):
             try:
                 Image.open(argDict.file)
             except IOError:
-                commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 2)
+                commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 7)
         else:
-            commons.throw("ERROR", f"No such file {argDict.file}", 3)
+            commons.throw("ERROR", f"No such file {argDict.file}", 8)
 
         uploadedImagePath = upload_file(argDict.file, argDict.name)
 
@@ -179,7 +179,7 @@ def main(argv):
                 Key = s3FilePath
             )
         except client.exceptions.NoSuchKey:
-            commons.throw("ERROR", f"No such file {s3FilePath} exists in S3.", 3)
+            commons.throw("ERROR", f"No such file {s3FilePath} exists in S3.", 9)
 
         delete_file(s3FilePath)
 
@@ -204,7 +204,7 @@ def main(argv):
             return matchedFace
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 3)
+            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 10)
         finally:
             # Reset signal handler everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
@@ -239,7 +239,7 @@ def main(argv):
             )["HLSStreamingSessionURL"]
 
         except kvmClient.exceptions.ResourceNotFoundException:
-            commons.throw("ERROR", f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again", 3)
+            commons.throw("ERROR", f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again", 11)
 
         # Start checking for a matching gesture, timing out if the correct sequence is not found within the limit
         vcap = cv2.VideoCapture(streamUrl)
@@ -257,7 +257,7 @@ def main(argv):
                     # Run gesture recog lib against captured frame
                     matchedGestures = gesture_recog.checkForGestures(frame, argDict.username)
                 else:
-                    commons.throw("ERROR", "Stream Interrupted or corrupted! Exiting...", 2)
+                    commons.throw("ERROR", "Stream Interrupted or corrupted! Exiting...", 12)
                     break
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
@@ -266,7 +266,7 @@ def main(argv):
 
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO GESTURES WERE FOUND IN THE STREAM!", 3)
+            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO GESTURES WERE FOUND IN THE STREAM!", 10)
         finally:
             # Reset signal handler everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
@@ -277,7 +277,7 @@ def main(argv):
             cv2.destroyAllWindows()
 
     else:
-        commons.throw("ERROR", f"Invalid action type - {argDict.action}", 2)
+        commons.throw("ERROR", f"Invalid action type - {argDict.action}", 13)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -1,18 +1,9 @@
 # -----------------------------------------------------------
 # Storage file for global variables and configs used across all scripts
 #
-# Copyright (c) 2020 Morgan Davies, UK
+# Copyright (c) 2021 Morgan Davies, UK
 # Released under MIT License
 # -----------------------------------------------------------
-
-#############################################
-# TODO: Need to update this with custom codes
-# ERROR CODE REFERENCE
-# --------------------
-# 1 - General
-# 2 - Command or param issue
-# 3 - Something wasn't found or is invalid
-#############################################
 
 from dotenv import load_dotenv
 import sys
@@ -33,8 +24,10 @@ def throw(errorType, message, code=None):
     :param message: Message to be sent alongside the errorType
     :param code: Exit code to terminate execution with
     """
-
-    print(f"[{errorType}] {message}")
+    errorMessage = f"[{errorType}] {message}"
+    if code is not None:
+        errorMessage += f"\nERROR CODE IS {code}"
+    print(errorMessage)
     if errorType in THROWABLE_ERRORS:
         sys.exit(code)
 
