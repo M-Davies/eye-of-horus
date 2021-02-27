@@ -4,7 +4,7 @@ This document contains info on my progress and vision for the machine learning m
 
 ## Gathering of training images
 
-*See #16 for the work item of this*
+*See [#16](https://github.com/M-Davies/eye-of-horus/issues/16) for the work item of this*
 
 AWS requires training images to be obtained and ran through the machine learning algorithm in order for it to identify a gesture a user is making on stream. To ensure as accurate machine learning algorithm as possible, we will be creating or retrieving a set of images containing the [proposed gestures](#Availablegestures) to use for the training data set. The images need to be diverse, in large quantity, in a similar location to where the program will actually be used and clearly containing the training data we need for the algorithm to pick out the gestures from a sea of different objects. AWS defines a [series of standards](https://docs.aws.amazon.com/rekognition/latest/customlabels-dg/gs-step-prepare-images-cli.html) that we will try our best to stick to when creating the images.
 
