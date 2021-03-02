@@ -40,11 +40,15 @@ def main(argv):
         try:
             Image.open(argDict.file)
         except IOError:
-            commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 7)
+            commons.respond(
+                messageType="ERROR",
+                message=f"File {argDict.file} exists but is not an image. Only jpg and png files are valid",
+                code=7
+            )
         checkForGestures(argDict.file, argDict.username)
     else:
         # Use an S3 object if no file was found at the image path given
-        commons.throw("WARNING", f"{argDict.file} does not exist as a local file. Attempting to retrieve the image using the same path from S3...")
+        print(f"[WARNING] {argDict.file} does not exist as a local file. Attempting to retrieve the image using the same path from S3...")
 
         # TODO: Either download the image or pass the link to custom labels
 

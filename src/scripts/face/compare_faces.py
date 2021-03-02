@@ -115,11 +115,9 @@ def examineShard(shardJson):
                 # Special case as when the signal handler cancels the script during a get records, it will raise this exception
                 raise TimeoutError
 
-            print(f"[INFO] Found records:\n{records}")
-
             # If records array empty, try adjacent shard and iterate until timeout expires or face is found
             if records["Records"] == []:
-                commons.throw("WARNING", f"No records were found in shard {shardJson['ShardId']}. Trying the next shard with iterator {records['NextShardIterator']}")
+                print(f"[WARNING] No records were found in shard {shardJson['ShardId']}. Trying the next shard with iterator {records['NextShardIterator']}")
                 iterator = records['NextShardIterator']
                 continue
             else:
@@ -132,11 +130,11 @@ def examineShard(shardJson):
 
         # API is being spammed. Sleep to let it recover
         except kinesis.exceptions.ProvisionedThroughputExceededException:
-            commons.throw("WARNING", "Exceeded AWS API limit for get-records. Sleeping and trying again...")
+            print("[WARNING] Exceeded AWS API limit for get-records. Sleeping and trying again...")
             time.sleep(0.5)
         # Shard Iterator has expired.
         except kinesis.exceptions.ExpiredIteratorException:
-            commons.throw("WARNING", "Shard iterator has expired. Recreating...")
+            print("[WARNING] Shard iterator has expired. Creating a new one now...")
             iterator = createShardIterator(shardJson["ShardId"])
 
     return faceFound
@@ -154,7 +152,7 @@ def checkForFaces():
         )
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} already exists")
     except rekog.exceptions.ResourceNotFoundException:
-        commons.throw("WARNING", f"{commons.FACE_RECOG_PROCESSOR} does not appear to exist. Creating now")
+        print(f"[WARNING] {commons.FACE_RECOG_PROCESSOR} does not appear to exist. Creating now...")
         processor = createProcessor()
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
 
@@ -179,7 +177,6 @@ def checkForFaces():
     for shard in shards:
         matchedFace = examineShard(shard)
 
-    # We will always return a successfull face or will be forcibly aborted by the manager timeout
-    print(f"[SUCCESS] Found a matching face!\n{matchedFace}")
+    # We will always return a successfull face or be forcibly aborted by the manager timeout
     return matchedFace
 

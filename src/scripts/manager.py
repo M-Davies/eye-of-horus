@@ -7,6 +7,7 @@
 
 import boto3
 from botocore.exceptions import ClientError
+from botocore.exceptions import EndpointConnectionError
 
 import cv2
 import sys
@@ -29,10 +30,17 @@ def delete_file(fileName):
     :param fileName: S3 Path to file to be deleted
     """
 
-    client.delete_object(
-        Bucket = commons.FACE_RECOG_BUCKET,
-        Key = fileName
-    )
+    try:
+        client.delete_object(
+            Bucket = commons.FACE_RECOG_BUCKET,
+            Key = fileName
+        )
+    except EndpointConnectionError:
+        commons.respond(
+            messageType="ERROR",
+            message="FAILED to delete object from S3. Could not establish a connection to AWS",
+            code=3
+        )
 
     # Verify the object was deleted
     try:
@@ -40,10 +48,22 @@ def delete_file(fileName):
             Bucket = commons.FACE_RECOG_BUCKET,
             Key = fileName
         )
-
-        commons.throw("ERROR", f"Failed to delete {fileName}. Deletion response:\n{deletionRequest}", 4)
     except client.exceptions.NoSuchKey:
         print(f"[SUCCESS] {fileName} has been successfully deleted from S3!")
+        return fileName
+    except EndpointConnectionError:
+        commons.respond(
+            messageType="ERROR",
+            message="FAILED to verify if object was successfully deleted from S3. Could not establish a connection to AWS",
+            code=2
+        )
+
+    commons.respond(
+        messageType="ERROR",
+        message=f"Failed to delete {fileName}",
+        content={ "ERROR" : deletionRequest },
+        code=4
+    )
 
 def upload_file(fileName, s3Name=None):
     """upload_file() : Uploads a file to an S3 bucket based off the input params entered.
@@ -70,9 +90,18 @@ def upload_file(fileName, s3Name=None):
                 Key = objectName
             )
     except ClientError as e:
-        commons.throw("ERROR", f"{fileName} FAILED to upload to S3\n{e}", 3)
-
-    print(f"[SUCCESS] {objectName} has been uploaded to {commons.FACE_RECOG_BUCKET}")
+        commons.respond(
+            messageType="ERROR",
+            message=f"{fileName} FAILED to upload to S3",
+            content={ "ERROR" : e },
+            code=3
+        )
+    except EndpointConnectionError:
+        commons.respond(
+            messageType="ERROR",
+            message="FAILED to upload to S3. Could not establish a connection to AWS",
+            code=3
+        )
 
     return objectName
 
@@ -84,7 +113,12 @@ def streamHandler(start):
         # Boot up live stream
         startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
         if startStreamRet != 0:
-            commons.throw("ERROR", f"Stream failed to start (error code {startStreamRet}), see log for details", 5)
+            commons.respond(
+                messageType="ERROR",
+                message=f"Stream failed to start (see CONTENT field for error code), see log for details",
+                content={ "ERROR" : startStreamRet },
+                code=5
+            )
         else:
             # We have to sleep for a bit here as the steam takes ~3s to boot
             time.sleep(3)
@@ -93,7 +127,12 @@ def streamHandler(start):
         stopStreamRet = subprocess.call("./stopStream.sh")
 
         if stopStreamRet != 0:
-            commons.throw("ERROR", f"Stream failed to die (error code {stopStreamRet}), see log for details", 6)
+            commons.respond(
+                messageType="ERROR",
+                message=f"Stream failed to die (see CONTENT field for error code), see log for details",
+                content={ "ERROR" : stopStreamRet },
+                code=6
+            )
 
 def timeoutHandler(signum, stackFrame):
     """timeoutHandler() : Raises a TimeoutError when the signal alarm goes off.
@@ -152,16 +191,36 @@ def main(argv):
             try:
                 Image.open(argDict.file)
             except IOError:
-                commons.throw("ERROR", f"File {argDict.file} exists but is not an image. Only jpg and png files are valid", 7)
+                commons.respond(
+                    messageType="ERROR",
+                    message=f"File {argDict.file} exists but is not an image. Only jpg and png files are valid",
+                    code=7
+                )
         else:
-            commons.throw("ERROR", f"No such file {argDict.file}", 8)
+            commons.respond(
+                messageType="ERROR",
+                message=f"No such file {argDict.file}",
+                code=8
+            )
 
-        uploadedImagePath = upload_file(argDict.file, argDict.name)
+        uploadedImage = upload_file(argDict.file, argDict.name)
 
         # Immediately index the photo into a local collection if param is set
         if argDict.index == True:
             print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
-            index_photo.add_face_to_collection(uploadedImagePath)
+            indexedImage = index_photo.add_face_to_collection(uploadedImage)
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{uploadedImage} successfully uploaded to S3 and indexed into the Rekognition Collection.",
+                content=indexedImage,
+                code=0
+            )
+        else:
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{uploadedImage} was successfully uploaded to S3 (not indexed). Specify -i to index into the Rekognition client.",
+                code=0
+            )
 
     # Ensure the file to be edited or deleted exists. Then, delete it from both the collection and S3 (if needs be)
     elif argDict.action == "delete":
@@ -169,7 +228,7 @@ def main(argv):
         # Immediately delete the photo from local collection if param is set
         if argDict.index == True:
             print(f"[INFO] Removing photo from {commons.FACE_RECOG_COLLECTION}")
-            index_photo.remove_face_from_collection(argDict.file)
+            deletedFace = index_photo.remove_face_from_collection(argDict.file)
 
         s3FilePath = f"users/{argDict.file}"
 
@@ -179,9 +238,27 @@ def main(argv):
                 Key = s3FilePath
             )
         except client.exceptions.NoSuchKey:
-            commons.throw("ERROR", f"No such file {s3FilePath} exists in S3.", 9)
+            commons.respond(
+                messageType="ERROR",
+                message=f"No such file {s3FilePath} exists in S3.",
+                code=9
+            )
 
-        delete_file(s3FilePath)
+        deletedFilename = delete_file(s3FilePath)
+
+        if argDict.index == True:
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{deletedFilename} was successfully removed from S3 and the Rekognition Collection.",
+                content=deletedFace,
+                code=0
+            )
+        else:
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{deletedFilename} was successfully removed from S3 but not from the Rekognition Collection. Please specify -i if you wish to remove the image from the collection too.",
+                code=0
+            )
 
     # Run comparison on stream
     elif argDict.action == "compare":
@@ -201,10 +278,19 @@ def main(argv):
 
             # By this point, we have found a face so cancel the timeout and return the matched face
             signal.alarm(0)
-            return matchedFace
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"Found a matching face!",
+                content=matchedFace,
+                code=0
+            )
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!", 10)
+            commons.respond(
+                messageType="ERROR",
+                message=f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO FACES WERE FOUND IN THE STREAM!",
+                code=10
+            )
         finally:
             # Reset signal handler everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
@@ -239,7 +325,11 @@ def main(argv):
             )["HLSStreamingSessionURL"]
 
         except kvmClient.exceptions.ResourceNotFoundException:
-            commons.throw("ERROR", f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again", 11)
+            commons.respond(
+                messageType="ERROR",
+                messsage=f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again",
+                code=11
+            )
 
         # Start checking for a matching gesture, timing out if the correct sequence is not found within the limit
         vcap = cv2.VideoCapture(streamUrl)
@@ -257,7 +347,11 @@ def main(argv):
                     # Run gesture recog lib against captured frame
                     matchedGestures = gesture_recog.checkForGestures(frame, argDict.username)
                 else:
-                    commons.throw("ERROR", "Stream Interrupted or corrupted! Exiting...", 12)
+                    commons.respond(
+                        messageType="ERROR",
+                        message="Stream Interrupted or corrupted!",
+                        code=12
+                    )
                     break
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
@@ -266,7 +360,11 @@ def main(argv):
 
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            commons.throw("ERROR", f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO GESTURES WERE FOUND IN THE STREAM!", 10)
+            commons.respond(
+                messageType="ERROR",
+                message=f"TIMEOUT FIRED AFTER {timeoutSeconds}s, NO GESTURES WERE FOUND IN THE STREAM!",
+                code=10
+            )
         finally:
             # Reset signal handler everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
@@ -277,7 +375,11 @@ def main(argv):
             cv2.destroyAllWindows()
 
     else:
-        commons.throw("ERROR", f"Invalid action type - {argDict.action}", 13)
+        commons.respond(
+            messageType="ERROR",
+            message=f"Invalid action type - {argDict.action}",
+            code=13
+        )
 
 if __name__ == "__main__":
     main(sys.argv[1:])

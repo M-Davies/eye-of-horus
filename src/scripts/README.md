@@ -4,6 +4,7 @@ These scripts can be used with the accompanying website OR on their own via the 
 
 ## Error/Exit Codes
 
+0. Successful exit
 1. General
 2. Something Wasn't Found
 3. Something Failed To Upload

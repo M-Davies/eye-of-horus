@@ -8,6 +8,7 @@
 from dotenv import load_dotenv
 import sys
 import os
+import json
 
 # GLOBAL VARIABLES USED BY ALL SCRIPTS
 FACE_RECOG_BUCKET = "eye-of-horus-bucket"
@@ -16,19 +17,30 @@ FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
 CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
 
-THROWABLE_ERRORS = ["ERROR", "EXCEPTION"]
+THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION", "SUCCESS"]
 
-def throw(errorType, message, code=None):
-    """throw() : Print infomational message and terminate execution
-    :param errorType: Type of error message (ERROR, WARNING, etc)
-    :param message: Message to be sent alongside the errorType
+def respond(messageType, code, message, content=None):
+    """respond() : Print/return informational JSON message and terminate execution
+    :param messageType: Type of message (ERROR, SUCCESS, etc)
     :param code: Exit code to terminate execution with
+    :param message: Short message to be sent describing the event
+    :param content: Optional excess message content (e.g. JSON data) used by the website or other scripts
     """
-    errorMessage = f"[{errorType}] {message}"
-    if code is not None:
-        errorMessage += f"\nERROR CODE IS {code}"
-    print(errorMessage)
-    if errorType in THROWABLE_ERRORS:
+    jsonMessage = json.dumps(
+        obj={
+            "TYPE"    : messageType,
+            "MESSAGE" : message,
+            "CONTENT" : json.dumps(content),
+            "CODE"    : code
+        },
+        indent=2
+    )
+    print(jsonMessage)
+
+    # For successes, we return as we assume the exit code is non-important for the website
+    if messageType == "SUCCESS":
+        return jsonMessage
+    elif messageType in THROWABLE_OUTCOMES:
         sys.exit(code)
 
 def parseObjectName(fileName):
