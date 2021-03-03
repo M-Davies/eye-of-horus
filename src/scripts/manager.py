@@ -115,7 +115,7 @@ def streamHandler(start):
         if startStreamRet != 0:
             commons.respond(
                 messageType="ERROR",
-                message=f"Stream failed to start (see CONTENT field for error code), see log for details",
+                message=f"Stream failed to start (CONTENT field is the exit code), see log for details",
                 content={ "ERROR" : startStreamRet },
                 code=5
             )
@@ -129,7 +129,7 @@ def streamHandler(start):
         if stopStreamRet != 0:
             commons.respond(
                 messageType="ERROR",
-                message=f"Stream failed to die (see CONTENT field for error code), see log for details",
+                message=f"Stream failed to die (see CONTENT field is the exit code), see log for details",
                 content={ "ERROR" : stopStreamRet },
                 code=6
             )
@@ -331,7 +331,7 @@ def main(argv):
                 code=11
             )
 
-        # Start checking for a matching gesture, timing out if the correct sequence is not found within the limit
+        # Start checking for a matching gesture combo, timing out if the correct sequence is not found within the limit
         vcap = cv2.VideoCapture(streamUrl)
         try:
             signal.signal(signal.SIGALRM, timeoutHandler)
@@ -350,6 +350,7 @@ def main(argv):
                     commons.respond(
                         messageType="ERROR",
                         message="Stream Interrupted or corrupted!",
+                        content={ "EXIT" : 12, "RETURN VALUE" : ret },
                         code=12
                     )
                     break

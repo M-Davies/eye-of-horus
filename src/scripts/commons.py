@@ -5,7 +5,6 @@
 # Released under MIT License
 # -----------------------------------------------------------
 
-from dotenv import load_dotenv
 import sys
 import os
 import json
@@ -16,6 +15,7 @@ FACE_RECOG_COLLECTION = "RekognitionCollection"
 FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
 CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
+GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
 
 THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION", "SUCCESS"]
 

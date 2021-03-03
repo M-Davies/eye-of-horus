@@ -18,3 +18,6 @@ These scripts can be used with the accompanying website OR on their own via the 
 11. Stream Wasn't Found
 12. Stream Was Interrupted
 13. Invalid Action Type
+14. Custom Label Project Failed To Start
+15. Custom Label Project Failed To Start Within The Timeout
+16. Custom Label Project Failed To Die (How incredibly rude that it's not allowed to live)
