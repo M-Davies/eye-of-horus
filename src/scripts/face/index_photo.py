@@ -2,7 +2,7 @@
 # Retrieves a photo from S3 or locally and adds it to a Rekognition Collection
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3

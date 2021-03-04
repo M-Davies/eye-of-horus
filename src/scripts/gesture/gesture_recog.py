@@ -2,7 +2,7 @@
 # Runs gesture recognition on the capture frame
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3

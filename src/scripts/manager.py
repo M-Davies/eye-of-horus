@@ -2,7 +2,7 @@
 # Uploads an image containing a face to S3
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3

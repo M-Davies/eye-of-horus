@@ -2,7 +2,7 @@
 # Compares a face from the stream with a face in the index to check for a valid face
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3
