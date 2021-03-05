@@ -20,7 +20,7 @@ from PIL import Image
 
 from face import index_photo
 from face import compare_faces
-from gesture import gesture_recog
+from gesture import detect_gesture
 import commons
 
 client = boto3.client('s3')
@@ -337,15 +337,17 @@ def main(argv):
             signal.signal(signal.SIGALRM, timeoutHandler)
             signal.alarm(timeoutSeconds)
 
-            matchedGestures = False
-            while(matchedGestures is False):
+            matchedGestures = 0
+            while(matchedGestures < 4):
 
                 # Capture frame-by-frame
                 ret, frame = vcap.read()
 
                 if ret is not False or frame is not None:
                     # Run gesture recog lib against captured frame
-                    matchedGestures = gesture_recog.checkForGestures(frame, argDict.username)
+                    foundGesture = detect_gesture.checkForGestures(frame, argDict.username)
+
+                    # TODO: Add logic here to check if user gesture is in the combination
                 else:
                     commons.respond(
                         messageType="ERROR",

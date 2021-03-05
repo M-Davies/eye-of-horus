@@ -1,5 +1,5 @@
 # -----------------------------------------------------------
-# Runs gesture recognition on the capture frame
+# Runs gesture recognition on the capture frame to see if it contains a gesture.
 #
 # Copyright (c) 2021 Morgan Davies, UK
 # Released under MIT License
@@ -20,7 +20,32 @@ load_dotenv()
 sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
 
-# TODO: Add comments to functions
+def analyseImage(image):
+    """analyseImage() : Queries the latest AWS Custom Label model for the gesture metadata. I.e. Does this image contain a gesture and if so, which one is it most likely?
+    :param image: Image/bytes to scan for gestures
+    :return: JSON object containing the gesture with the highest confidence
+    """
+    try:
+        with open(image, "rb") as fileBytes:
+            detectedLabels = client.detect_custom_labels(
+                Image={
+                    'Bytes': fileBytes,
+                },
+                MinConfidence=70,
+                ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
+            )['CustomLabels']
+    except OSError:
+        print("[WARNING] Image file could not be found, it is likely we already have the image bytes...")
+        detectedLabels = client.detect_custom_labels(
+            Image={
+                'Bytes': image,
+            },
+            MinConfidence=70,
+            ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
+        )['CustomLabels']
+
+    # Extract gesture with highest confidence
+    return max(detectedLabels, key = lambda ev: ev["Confidence"])
 
 def getProjectVersions():
     """getProjectVersions() : Retrieves all versions of the custom labels model. Often, we will only use the first/latest version as that is generally the most accurate and up-to-date
@@ -96,9 +121,10 @@ def checkForGestures(image, username):
             print(f"[SUCCESS] The latest model (created at {versionDetails['CreationTimestamp']} is already running!")
 
         # Analyse the given image
-        print(f"[INFO] Beginning analysis of image for user {username}")
-
-
+        print(f"[INFO] Beginning analysis of image for user {username}...")
+        anaylsisResponse = analyseImage(image)
+        print(f"[SUCCESS] Found a gesture in the image\n{anaylsisResponse}")
+        return anaylsisResponse
 
     # Stop the model after recog is complete
     finally:
@@ -145,7 +171,7 @@ def main(argv):
     )
     argDict = argumentParser.parse_args()
 
-    # Check if we're using a local file
+    # We will always be using a local file (or it's file bytes) so no need to check if in s3 or not here
     if os.path.isfile(argDict.file):
         try:
             Image.open(argDict.file)
@@ -155,12 +181,16 @@ def main(argv):
                 message=f"File {argDict.file} exists but is not an image. Only jpg and png files are valid",
                 code=7
             )
-        checkForGestures(argDict.file, argDict.username)
-    else:
-        # Use an S3 object if no file was found at the image path given
-        print(f"[WARNING] {argDict.file} does not exist as a local file. Attempting to retrieve the image using the same path from S3...")
+        foundGesture = checkForGestures(argDict.file, argDict.username)
 
-        # TODO: Either download the image or pass the link to custom labels
+        # We have found a gesture, let's see if the user has one that matches
+        # TODO: Add logic here for checking a user's gesture combo
+    else:
+        commons.respond(
+            messageType="ERROR",
+            message=f"No such file {argDict.file}",
+            code=8
+        )
 
 if __name__ == "__main__":
     main(sys.argv[1:])
