@@ -334,20 +334,33 @@ def main(argv):
         # Start checking for a matching gesture combo, timing out if the correct sequence is not found within the limit
         vcap = cv2.VideoCapture(streamUrl)
         try:
+            # Start timer
             signal.signal(signal.SIGALRM, timeoutHandler)
             signal.alarm(timeoutSeconds)
 
-            matchedGestures = 0
-            while(matchedGestures < 4):
+            matchedGestures = 1
+            while(matchedGestures < 5):
 
                 # Capture frame-by-frame
                 ret, frame = vcap.read()
 
                 if ret is not False or frame is not None:
                     # Run gesture recog lib against captured frame
-                    foundGesture = detect_gesture.checkForGestures(frame, argDict.username)
+                    foundGesture = detect_gesture.checkForGestures(frame)
 
                     # TODO: Add logic here to check if user gesture is in the combination
+                    print(f"[INFO] Checking if {argDict.username} contains the identified gesture at position {matchedGestures}...")
+                    hasGesture = detect_gesture.inUserCombination(foundGesture, argDict.username, matchedGestures)
+
+                    # User has gesture and it's at the right position
+                    if hasGesture is True:
+                        print(f"[SUCCESS] Correct gesture given for position {matchedGestures}! Checking next gesture...")
+                        matchedGestures += 1
+                        continue
+                    else:
+                        # TODO: Not sure if we should be printing this without using the commons lib
+                        print(f"[WARNING] Image for position {matchedGestures} was not the right gesture or the wrong position in the user combination. Checking next image...")
+                        continue
                 else:
                     commons.respond(
                         messageType="ERROR",
@@ -355,12 +368,14 @@ def main(argv):
                         content={ "EXIT" : 12, "RETURN VALUE" : ret },
                         code=12
                     )
-                    break
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
             signal.alarm(0)
-            print(f"[SUCCESS] Matched gesture combination for user {argDict.username}!")
-
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"Matched gesture combination for user {argDict.username}!",
+                code=0
+            )
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             commons.respond(
@@ -369,7 +384,7 @@ def main(argv):
                 code=10
             )
         finally:
-            # Reset signal handler everytime
+            # Reset/stop timer everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             streamHandler(False)
 

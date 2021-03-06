@@ -17,7 +17,7 @@ CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
 GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
 
-THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION", "SUCCESS"]
+THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION"]
 
 def respond(messageType, code, message, content=None):
     """respond() : Print/return informational JSON message and terminate execution
