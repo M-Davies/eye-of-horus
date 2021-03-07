@@ -65,12 +65,28 @@ def delete_file(fileName):
         code=4
     )
 
-def upload_file(fileName, username, s3Name=None):
+def upload_file(fileName, username, locktype=None, s3Name=None):
     """upload_file() : Uploads a file to an S3 bucket based off the input params entered.
     :param fileName: Path to file to be uploaded
     :param username: User to upload the new face details to
     :param s3Name: S3 object name and or path. If not specified then the filename is used
     """
+    # Verify file exists
+    if os.path.isfile(fileName):
+        try:
+            Image.open(fileName)
+        except IOError:
+            commons.respond(
+                messageType="ERROR",
+                message=f"File {fileName} exists but is not an image. Only jpg and png files are valid",
+                code=7
+            )
+    else:
+        commons.respond(
+            messageType="ERROR",
+            message=f"No such file {fileName}",
+            code=8
+        )
 
     # If S3 name was not specified, use fileName
     if s3Name is None:
@@ -78,7 +94,11 @@ def upload_file(fileName, username, s3Name=None):
     else:
         objectName = commons.parseImageObject(s3Name)
 
-    objectName = f"users/{username}/{objectName}"
+    # For gestures include the locktype folder path
+    if locktype is not None:
+        objectName = f"users/{username}/{locktype}/{objectName}"
+    else:
+        objectName = f"users/{username}/{objectName}"
 
     print(f"[INFO] S3 Object Path will be {objectName}")
 
@@ -142,6 +162,22 @@ def timeoutHandler(signum, stackFrame):
     """
     raise TimeoutError
 
+def constructGestureFramework(imagePaths, username, locktype):
+    """constructGestureFramework() : Uploads gesture recognition images to the user's S3 folder
+    :param imagePaths: List of images paths (in combination order) to upload
+    :param username: Username folder to upload the images to
+    :param locktype: Either lock or unlock (usually), depicts which combination the images are a part of
+    :returns: A completed gestures.json config file
+    """
+    position = 1
+    gestureConfig = {}
+    for path in imagePaths:
+        s3ObjectPath = upload_file(path, username, locktype)
+        commons.respond(messageType="SUCCESS", message=f"Gesture locking image ({path}) has been successfully uploaded for position {position}", code=0)
+        gestureConfig[str(position)] = { "path" : s3ObjectPath }
+        position += 1
+    return gestureConfig
+
 #########
 # START #
 #########
@@ -159,9 +195,19 @@ def main(argv):
         help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Uploads the --file to S3 and indexes it (if --index is present). --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside S3.\n\ncompare: Executes the facial comparison library against ALL users in the database.\n\ngesture: Executes the gesture comparison library against the logged in user.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
-    argumentParser.add_argument("-f", "--file",
+    argumentParser.add_argument("-f", "--face",
         required=False,
-        help="Full path to jpg or png image file to be manipulated in this operation."
+        help="Path to the jpg or png image file to use as your facial recognition face to compare against when streaming"
+    )
+    argumentParser.add_argument("-l", "--lock-gestures",
+        required=False,
+        action="extend",
+        help="Paths to jpg or png image files (seperated with spaces) to use as your lock gesture recognition combination when streaming"
+    )
+    argumentParser.add_argument("-u", "--unlock-gestures",
+        required=False,
+        action="extend",
+        help="Paths to jpg or png image files (seperated with spaces) to use as your unlock gesture recognition combination when streaming"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -178,7 +224,7 @@ def main(argv):
         type=int,
         help=f"Timeout (in seconds) for the stream to timeout after not finding a face or gesture during comparison\nUsed with -a compare or -a gesture, default is {timeoutSeconds}"
     )
-    argumentParser.add_argument("-u", "--username",
+    argumentParser.add_argument("-p", "--profile",
         required=False,
         help="Username to retrieve the gestures from AWS for comparison with the gestures performed on the stream\nUsed with -a gesture"
     )
@@ -189,51 +235,68 @@ def main(argv):
     # Add a new user face
     # TODO: Add the ability to add a gesture combination here too
     if argDict.action == "create":
-        # Ensure that the file to be uploaded is an existing photo
-        if os.path.isfile(argDict.file):
-            try:
-                Image.open(argDict.file)
-            except IOError:
-                commons.respond(
-                    messageType="ERROR",
-                    message=f"File {argDict.file} exists but is not an image. Only jpg and png files are valid",
-                    code=7
-                )
-        else:
+        # Verify we have a lock and unlock gesture
+        if argDict.lock is [] and argDict.unlock is []:
             commons.respond(
                 messageType="ERROR",
-                message=f"No such file {argDict.file}",
-                code=8
+                message=f"-l or -u was not given. Please provide a locking and unlocking gesture so your user account can be created.",
+                code=13
             )
-
-        # Verify we have a username to upload to
-        if argDict.username is None or "":
+        # Verify we have a username to upload the object to
+        if argDict.profile is None:
             commons.respond(
                 messageType="ERROR",
-                message=f"No username was given to upload a file to. Specify a username with -u/--username",
+                message=f"-p was not given. Please provide a profile username for your account.",
                 code=13
             )
 
-        uploadedImage = upload_file(argDict.file, argDict.username, argDict.name)
+        uploadedImage = upload_file(argDict.face, argDict.profile, None, argDict.name)
 
         # Immediately index the photo into a local collection if param is set
         if argDict.index == True:
             print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
             # uploadedImage will the objectName so no need to check if there is a user in this function
             indexedImage = index_photo.add_face_to_collection(uploadedImage)
-
-            return commons.respond(
+            commons.respond(
                 messageType="SUCCESS",
                 message=f"{uploadedImage} successfully uploaded to S3 and indexed into the Rekognition Collection.",
                 content=indexedImage,
                 code=0
             )
         else:
-            return commons.respond(
+            commons.respond(
                 messageType="SUCCESS",
                 message=f"{uploadedImage} was successfully uploaded to S3 (not indexed). Specify -i to index into the Rekognition client.",
                 code=0
             )
+
+        # Iterate over the lock and unlock image files, uploading them one a time while constructing our gestures.json
+        lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
+        unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
+        gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
+
+        # Finally, upload our completed gestures.json
+        print("[INFO] Images have been successfully uploaded. Uploading config file...")
+        try:
+            client.putObject(
+                Body=gestureConfig,
+                Bucket=commons.FACE_RECOG_BUCKET,
+                Key=f"users/{argDict.profile}/gestureConfig.json"
+            )
+        except Exception as e:
+            commons.respond(
+                messageType="ERROR",
+                message=f"Failed to upload the gesture configuration file",
+                content={ "ERROR" : e },
+                code=3
+            )
+
+        print("[SUCCESS] Config file uploaded!")
+        return commons.respond(
+            messageType="SUCCESS",
+            message=f"Facial recognition and gesture recognition images and configs files have been successfully uploaded!",
+            code=0
+        )
 
     # Ensure the file to be edited or deleted exists. Then, delete it from both the collection and S3 (if needs be)
     elif argDict.action == "delete":
@@ -241,7 +304,7 @@ def main(argv):
         # Immediately delete the photo from local collection if param is set
         if argDict.index == True:
             print(f"[INFO] Removing photo from {commons.FACE_RECOG_COLLECTION}")
-            deletedFace = index_photo.remove_face_from_collection(argDict.file)
+            deletedFace = index_photo.remove_face_from_collection(argDict.face)
 
         # Verify we have a username to delete the image from
         if argDict.username is None or "":
@@ -366,7 +429,7 @@ def main(argv):
 
                 if ret is not False or frame is not None:
                     # Run gesture recog lib against captured frame
-                    matchedGestures = gesture_recog.checkForGestures(frame, argDict.username)
+                    matchedGestures = gesture_recog.checkForGestures(frame, argDict.profile)
                 else:
                     commons.respond(
                         messageType="ERROR",
@@ -377,7 +440,7 @@ def main(argv):
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
             signal.alarm(0)
-            print(f"[SUCCESS] Matched gesture combination for user {argDict.username}!")
+            print(f"[SUCCESS] Matched gesture combination for user {argDict.profile}!")
 
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
