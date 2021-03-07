@@ -2,7 +2,7 @@
 # Compares a face from the stream with a face in the index to check for a valid face
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3
@@ -24,41 +24,9 @@ sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
 import time
 
-def createProcessor():
-    """
-    createProcessor() : Creates a stream processor.
-
-    We assume that the kinesis video and data streams have already been created using the console.
-    The default FaceMatchThreshold has been increased since testing has shown it to be quicker at this level.
-    """
-    rekog.create_stream_processor(
-        Input={
-            "KinesisVideoStream": {
-                "Arn": knVideo.describe_stream(StreamName=commons.CAMERA_STREAM_NAME)["StreamInfo"]["StreamARN"]
-            }
-        },
-        Output={
-            "KinesisDataStream": {
-                "Arn": kinesis.describe_stream(StreamName=commons.CAMERA_DATASTREAM_NAME)["StreamDescription"]["StreamARN"]
-            }
-        },
-        Name=commons.FACE_RECOG_PROCESSOR,
-        Settings={
-            "FaceSearch": {
-                "CollectionId": commons.FACE_RECOG_COLLECTION,
-                "FaceMatchThreshold": 90
-            }
-        },
-        RoleArn=os.getenv("ROLE_ARN")
-    )
-
-    # Once it has been created, this should now pass without a ResourceNotFoundException
-    return rekog.describe_stream_processor(Name = commons.FACE_RECOG_PROCESSOR)
-
 def examineFace(record):
     """
     examineFace() : Decode and parse the shard bytes to extract a high matching face object
-
     :param record: Shard containing frames and fragment numbers
     :return: The matched face object with the highest similarity to the detected face
     """
@@ -85,7 +53,6 @@ def createShardIterator(shardId):
     createShardIterator() : Creates an interator that will allow searching through the shards. This will be called multiple times as shard iterators usually expire after 5mins
 
     See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kinesis.html#Kinesis.Client.get_shard_iterator
-
     :param shardId: ID of the shard to create an iterator for
     :return: The shard iterator ID
     """
@@ -153,7 +120,27 @@ def checkForFaces():
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} already exists")
     except rekog.exceptions.ResourceNotFoundException:
         print(f"[WARNING] {commons.FACE_RECOG_PROCESSOR} does not appear to exist. Creating now...")
-        processor = createProcessor()
+        rekog.create_stream_processor(
+            Input={
+                "KinesisVideoStream": {
+                    "Arn": knVideo.describe_stream(StreamName=commons.CAMERA_STREAM_NAME)["StreamInfo"]["StreamARN"]
+                }
+            },
+            Output={
+                "KinesisDataStream": {
+                    "Arn": kinesis.describe_stream(StreamName=commons.CAMERA_DATASTREAM_NAME)["StreamDescription"]["StreamARN"]
+                }
+            },
+            Name=commons.FACE_RECOG_PROCESSOR,
+            Settings={
+                "FaceSearch": {
+                    "CollectionId": commons.FACE_RECOG_COLLECTION,
+                    "FaceMatchThreshold": 90
+                }
+            },
+            RoleArn=os.getenv("ROLE_ARN")
+        )
+        processor = rekog.describe_stream_processor(Name = commons.FACE_RECOG_PROCESSOR)
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
 
     if processor["Status"] != "RUNNING":
@@ -173,7 +160,7 @@ def checkForFaces():
     )["Shards"]
 
     # Iterate through the shards
-    # NOTE: might not be needed as the stream only serves a max of one shard
+    # NOTE: might not be needed as currently the stream only serves a max of one shard
     for shard in shards:
         matchedFace = examineShard(shard)
 

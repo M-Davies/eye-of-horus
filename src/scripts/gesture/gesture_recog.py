@@ -2,7 +2,7 @@
 # Runs gesture recognition on the capture frame to see if it contains a gesture. Will check if a user posses such a gesture in their pattern if so.
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import boto3

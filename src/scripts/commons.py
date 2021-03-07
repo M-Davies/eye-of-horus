@@ -2,7 +2,7 @@
 # Storage file for global variables and configs used across all scripts
 #
 # Copyright (c) 2021 Morgan Davies, UK
-# Released under MIT License
+# Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
 import sys
