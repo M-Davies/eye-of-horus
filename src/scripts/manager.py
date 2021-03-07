@@ -65,9 +65,10 @@ def delete_file(fileName):
         code=4
     )
 
-def upload_file(fileName, s3Name=None):
+def upload_file(fileName, username, s3Name=None):
     """upload_file() : Uploads a file to an S3 bucket based off the input params entered.
     :param fileName: Path to file to be uploaded
+    :param username: User to upload the new face details to
     :param s3Name: S3 object name and or path. If not specified then the filename is used
     """
 
@@ -77,7 +78,7 @@ def upload_file(fileName, s3Name=None):
     else:
         objectName = commons.parseImageObject(s3Name)
 
-    objectName = f"users/{objectName}"
+    objectName = f"users/{username}/{objectName}"
 
     print(f"[INFO] S3 Object Path will be {objectName}")
 
@@ -185,8 +186,10 @@ def main(argv):
     print("[INFO] Parsed arguments:")
     print(argDict)
 
-    # Ensure that the file to be uploaded is an existing photo
+    # Add a new user face
+    # TODO: Add the ability to add a gesture combination here too
     if argDict.action == "create":
+        # Ensure that the file to be uploaded is an existing photo
         if os.path.isfile(argDict.file):
             try:
                 Image.open(argDict.file)
@@ -203,12 +206,22 @@ def main(argv):
                 code=8
             )
 
-        uploadedImage = upload_file(argDict.file, argDict.name)
+        # Verify we have a username to upload to
+        if argDict.username is None or "":
+            commons.respond(
+                messageType="ERROR",
+                message=f"No username was given to upload a file to. Specify a username with -u/--username",
+                code=13
+            )
+
+        uploadedImage = upload_file(argDict.file, argDict.username, argDict.name)
 
         # Immediately index the photo into a local collection if param is set
         if argDict.index == True:
             print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
+            # uploadedImage will the objectName so no need to check if there is a user in this function
             indexedImage = index_photo.add_face_to_collection(uploadedImage)
+
             return commons.respond(
                 messageType="SUCCESS",
                 message=f"{uploadedImage} successfully uploaded to S3 and indexed into the Rekognition Collection.",
@@ -230,7 +243,15 @@ def main(argv):
             print(f"[INFO] Removing photo from {commons.FACE_RECOG_COLLECTION}")
             deletedFace = index_photo.remove_face_from_collection(argDict.file)
 
-        s3FilePath = f"users/{argDict.file}"
+        # Verify we have a username to delete the image from
+        if argDict.username is None or "":
+            commons.respond(
+                messageType="ERROR",
+                message=f"No username was given to delete an image from. Specify a username with -u/--username",
+                code=13
+            )
+
+        s3FilePath = f"users/{argDict.username}/{argDict.file}"
 
         try:
             client.get_object_acl(
