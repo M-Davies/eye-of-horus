@@ -77,7 +77,7 @@ def getProjectVersions():
             ]
         )["ProjectVersionDescriptions"]
     except Exception as e:
-        commons.respond(
+        return commons.respond(
             messageType="ERROR",
             message="Failed to retrieve project version descriptions. Please check your internet connection and .env file.",
             content={ "ERROR" : e },
@@ -105,7 +105,7 @@ def checkForGestures(image):
                     MinInferenceUnits=1 # Stick to one unit to save money
                 )
             except Exception as e:
-                commons.respond(
+                return commons.respond(
                     messageType="ERROR",
                     message=f"Failed to start {commons.GESTURE_RECOG_PROJECT_NAME}.",
                     content={ "ERROR" : e },
@@ -125,7 +125,7 @@ def checkForGestures(image):
                     }
                 )
             except Exception as e:
-                commons.respond(
+                return commons.respond(
                     messageType="ERROR",
                     message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly within 1min",
                     content={ "ERROR" : e },
@@ -142,19 +142,11 @@ def checkForGestures(image):
         analysisResponse = analyseImage(image)
 
         if analysisResponse is not None:
-            commons.respond(
-                messageType="SUCCESS",
-                message=f"Found a gesture for image!",
-                content=analysisResponse,
-                code=0
-            )
+            print(f"[SUCCESS] Found a gesture!\n{analysisResponse}")
             return analysisResponse
         else:
-            commons.respond(
-                messageType="WARNING",
-                message=f"No gesture was detected in image!",
-                code=0
-            )
+            # Just return None and leave the error handling to the caller
+            return None
 
     # Stop the model after recog is complete
     finally:

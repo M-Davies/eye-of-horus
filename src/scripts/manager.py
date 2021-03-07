@@ -415,10 +415,16 @@ def main(argv):
 
                 if ret is not False or frame is not None:
                     # Run gesture recog lib against captured frame
-                    foundGesture = gesture_recog.checkForGestures(frame, argDict.profile)
+                    foundGesture = gesture_recog.checkForGestures(frame)
+                    if foundGesture is None:
+                        return commons.respond(
+                            messageType="ERROR",
+                            message=f"No recognised gesture was found within image {matchedGestures}",
+                            code=17
+                        )
 
-                    print(f"[INFO] Checking if {argDict.username} contains the identified gesture at position {matchedGestures}...")
-                    hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.username, matchedGestures)
+                    print(f"[INFO] Checking if {argDict.profile} contains the identified gesture at position {matchedGestures}...")
+                    hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, matchedGestures)
 
                     # User has gesture and it's at the right position
                     if hasGesture is True:
@@ -426,7 +432,11 @@ def main(argv):
                         matchedGestures += 1
                         continue
                     else:
-                        print(f"[WARNING] Image for position {matchedGestures} was not the right gesture or the wrong position in the user combination. Checking next image...")
+                        return commons.respond(
+                            messageType="ERROR",
+                            message=f"Image for position {matchedGestures} was not the right gesture or the wrong position in the user combination.",
+                            code=18
+                        )
                         continue
                 else:
                     return commons.respond(
