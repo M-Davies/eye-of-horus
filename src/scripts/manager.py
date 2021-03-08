@@ -38,7 +38,7 @@ def delete_file(fileName):
             Key = fileName
         )
     except EndpointConnectionError:
-        commons.respond(
+        return commons.respond(
             messageType="ERROR",
             message="FAILED to delete object from S3. Could not establish a connection to AWS",
             code=3
@@ -54,7 +54,7 @@ def delete_file(fileName):
         print(f"[SUCCESS] {fileName} has been successfully deleted from S3!")
         return fileName
     except EndpointConnectionError:
-        commons.respond(
+        return commons.respond(
             messageType="ERROR",
             message="FAILED to verify if object was successfully deleted from S3. Could not establish a connection to AWS",
             code=2
@@ -85,11 +85,8 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
                 code=7
             )
     else:
-        return commons.respond(
-            messageType="ERROR",
-            message=f"No such file {fileName}",
-            code=8
-        )
+        # Throw an error here instead of a response as sometimes the file will be a label for gesture recognition
+        raise FileNotFoundError
 
     # If S3 name was not specified, use fileName
     if s3Name is None:
@@ -166,18 +163,40 @@ def timeoutHandler(signum, stackFrame):
     raise TimeoutError
 
 def constructGestureFramework(imagePaths, username, locktype):
-    """constructGestureFramework() : Uploads gesture recognition images to the user's S3 folder
-    :param imagePaths: List of images paths (in combination order) to upload
-    :param username: Username folder to upload the images to
+    """constructGestureFramework() : Uploads gesture recognition images and config file to the user's S3 folder
+    :param imagePaths: List of images paths or gesture types (in combination order)
+    :param username: Username as per their s3 folder
     :param locktype: Either lock or unlock (usually), depicts which combination the images are a part of
-    :returns: A completed gestures.json config file
+    :returns: A completed gestures.json config
     """
     position = 1
     gestureConfig = {}
     for path in imagePaths:
-        s3ObjectPath = upload_file(path, username, locktype, f"{locktype}Gesture{position}")
-        commons.respond(messageType="SUCCESS", message=f"Gesture locking image ({path}) has been successfully uploaded for position {position}", code=0)
-        gestureConfig[str(position)] = { "path" : s3ObjectPath }
+        try:
+            s3ObjectPath = upload_file(path, username, locktype, f"{locktype}Gesture{position}")
+            print(f"[INFO] Gesture locking image ({path}) has been successfully uploaded for position {position}. Identifying gesture type...")
+            gestureType = gesture_recog.analyseImage(s3ObjectPath)['Name']
+            if gestureType is not None:
+                print(f"[SUCCESS] Gesture type identified as {gestureType}")
+            else:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"No recognised gesture was found within the image",
+                    code=17
+                )
+        except FileNotFoundError:
+            gestureType = path
+            print(f"[INFO] No image to upload ({gestureType} is the assumed name of the gesture type). Verifying this is a supported gesture type...")
+            # We don't need to do this for a file as it is scanned for valid gestures during analysis
+            gestureTypes = gesture_recog.gestureTypeIsValid(gestureType)
+            if gestureType not in gestureTypes:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"{gestureType} is not a valid gesture type. Valid gesture types = {gestureTypes.join(' ')}",
+                    code=17
+                )
+
+        gestureConfig[str(position)] = { "gesture" : gestureType, "path" : s3ObjectPath }
         position += 1
     return gestureConfig
 
@@ -202,15 +221,15 @@ def main(argv):
         required=False,
         help="Path to the jpg or png image file to use as your facial recognition face to compare against when streaming"
     )
-    argumentParser.add_argument("-l", "--lock-gestures",
+    argumentParser.add_argument("-l", "--lock",
         required=False,
         action="extend",
-        help="Paths to jpg or png image files (seperated with spaces) to use as your lock gesture recognition combination when streaming"
+        help="Two options for this command:\n1) FOR -a create = 4 Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to lock their system using their lock gesture pattern"
     )
-    argumentParser.add_argument("-u", "--unlock-gestures",
+    argumentParser.add_argument("-u", "--unlock",
         required=False,
         action="extend",
-        help="Paths to jpg or png image files (seperated with spaces) to use as your unlock gesture recognition combination when streaming"
+        help="Two options for this command:\n1)FOR -a create = 4 Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to unlock their system using their unlock gesture pattern"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -248,7 +267,14 @@ def main(argv):
                 code=13
             )
 
-        uploadedImage = upload_file(argDict.face, argDict.profile, None, argDict.name)
+        try:
+            uploadedImage = upload_file(argDict.face, argDict.profile, None, argDict.name)
+        except FileNotFoundError:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"No such file {argDict.face}",
+                code=8
+            )
 
         print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
 
@@ -284,7 +310,7 @@ def main(argv):
             code=0
         )
 
-    # Ensure the file to be edited or deleted exists. Then, delete it from both the collection and S3 (if needs be)
+    # Ensure the user account to be edited or deleted exists. Then, delete the data from both the collection and S3
     elif argDict.action == "delete":
 
         # Verify we have a username to delete
@@ -319,12 +345,12 @@ def main(argv):
 
         return commons.respond(
             messageType="SUCCESS",
-            message=f"User folder for {argDict.profile} was successfully removed from S3 and the respective photo removed from the Rekognition Collection.",
+            message=f"User folder for {argDict.profile} was successfully removed from S3 and the respective face reference removed from the Rekognition Collection.",
             content=deletedFace,
             code=0
         )
 
-    # Run comparison on stream
+    # Run face comparison on stream
     elif argDict.action == "compare":
         if argDict.timeout != None:
             timeoutSecondsFace = argDict.timeout
@@ -360,7 +386,7 @@ def main(argv):
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             streamHandler(False)
 
-    # Run gesture recognition lib
+    # Run gesture recognition on stream
     elif argDict.action == "gesture":
         if argDict.profile == None:
             return commons.respond(
@@ -369,17 +395,37 @@ def main(argv):
                 code=13
             )
 
+        # We can't try to unlock AND lock the system at the same time
+        if argDict.lock is not None and argDict.unlock is not None:
+            return commons.respond(
+                messageType="ERROR",
+                message="Cannot lock (-l) and unlock (-u) at the same time. Please specify one option at a time.",
+                code=13
+            )
+        # Likewise, we cannot try to find a gesture if we don't know which type to search
+        elif argDict.lock is None and argDict.unlock is None:
+            return commons.respond(
+                messageType="ERROR",
+                message="Neither Lock (-l) or Unlock (-u) flags very given. Please specify one type of gesture combination to attempt authentication with.",
+                code=13
+            )
+        # Otherwise, figure out if we are locking or unlocking
+        else:
+            if argDict.lock is not None:
+                locktype = "lock"
+            else:
+                locktype = "unlock"
+
         # Set a higher default timeout for gesture recog as it will take longer
         if argDict.timeout != None:
             timeoutSecondsGesture = argDict.timeout
-        print(f"[INFO] Running gesture recognition library to check for the correct gestures performed in current stream (timing out after {timeoutSecondsGesture}s)...")
+        print(f"[INFO] Running gesture recognition library to check for the correct {locktype}ing gestures performed in current stream (timing out after {timeoutSecondsGesture}s)...")
 
         # Start/end stream
         streamHandler(True)
 
         # Retrieve stream's session url endpoint
-        kvClient = boto3.client('kinesisvideo')
-        endpoint = kvClient.get_data_endpoint(
+        endpoint = boto3.client('kinesisvideo').get_data_endpoint(
             StreamName = commons.CAMERA_STREAM_NAME,
             APIName = "GET_HLS_STREAMING_SESSION_URL"
         )["DataEndpoint"]
@@ -408,6 +454,7 @@ def main(argv):
             signal.alarm(timeoutSecondsGesture)
 
             matchedGestures = 1
+            # We're actually looking for 4 gestures as part of the pin but it's better user feedback to start at 1 rather than 0
             while(matchedGestures < 5):
 
                 # Capture frame-by-frame
@@ -423,8 +470,8 @@ def main(argv):
                             code=17
                         )
 
-                    print(f"[INFO] Checking if {argDict.profile} contains the identified gesture at position {matchedGestures}...")
-                    hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, matchedGestures)
+                    print(f"[INFO] Checking if {argDict.profile} contains the correct gesture for the {locktype} combination at position {matchedGestures}...")
+                    hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, matchedGestures)
 
                     # User has gesture and it's at the right position
                     if hasGesture is True:
@@ -437,7 +484,6 @@ def main(argv):
                             message=f"Image for position {matchedGestures} was not the right gesture or the wrong position in the user combination.",
                             code=18
                         )
-                        continue
                 else:
                     return commons.respond(
                         messageType="ERROR",
@@ -448,17 +494,26 @@ def main(argv):
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
             signal.alarm(0)
-            return commons.respond(
-                messageType="SUCCESS",
-                message=f"Matched gesture combination for user {argDict.profile}",
-                code=0
-            )
+
+            if matchedGestures is 5:
+                return commons.respond(
+                    messageType="SUCCESS",
+                    message=f"Matched {locktype} gesture combination for user {argDict.profile}",
+                    code=0
+                )
+            else:
+                # Include this check just in case something goes wrong with the timeout handler
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"Stream timeout FAILED to execute. The correct gesture combination was not detected",
+                    code=19
+                )
 
         except TimeoutError:
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             return commons.respond(
                 messageType="ERROR",
-                message=f"TIMEOUT FIRED AFTER {timeoutSecondsGesture}s, NO GESTURES WERE FOUND IN THE STREAM!",
+                message=f"TIMEOUT FIRED AFTER {timeoutSecondsGesture}s, CORRECT GESTURE COMBINATION WAS NOT FOUND IN THE STREAM!",
                 code=10
             )
         finally:

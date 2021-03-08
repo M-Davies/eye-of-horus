@@ -21,26 +21,58 @@ load_dotenv()
 sys.path.append(os.path.dirname(__file__) + "/..")
 import commons
 
-def inUserCombination(gestureJson, username, position):
+def inUserCombination(gestureJson, username, locktype, position):
     """inUserCombination() : Calculates if the given gesture is in the user's combination and in the correct position.
     :param gestureJson: Identified gesture JSON object returned from AWS detect_custom_labels
     :param username: User to pull gesture combination
+    :param locktype: Whether we are locking or unlocking
     :param position: Position in the combination we are checking for the gestureJson
     :return: Boolean denoting if the given gesture and position are both valid in the user's gesture combination
     """
-
     # Retrieve user's gesture config file
-    gestureConfig = s3Client.get_object(
+    try:
+        gestureConfig = dict(s3Client.get_object(
+            Bucket=commons.FACE_RECOG_BUCKET,
+            Key=f"users/{username}/GestureConfig.json"
+        )['Body'])
+    except s3Client.exceptions.NoSuchKey:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"No such user gesture config file exists in S3. Does this user exist?",
+            code=9
+        )
+    except Exception as e:
+        return commons.respond(
+            messageType="ERROR",
+            message="Failed to retrieve user gesture config file. Please check your internet connection.",
+            content={ "ERROR" : e },
+            code=2
+        )
+
+    # Is the label position a match for the gesture detected?
+    print(f"[INFO] Gesture config file for {username} has been retrieved. Checking if detected gesture is in {locktype}ing combination at position {position}...")
+    if gestureConfig[locktype][position]["gesture"] == gestureJson["Name"]:
+        return True
+    else:
+        return False
+
+def getGestureTypes():
+    """getGestureTypes() : Gets a list of viable gesture types based off the rekognition project labels. Unfortunately, rekognition does not support pulling labels from a project directly so we will have to settle with pulling them from s3 instead
+    :return: List of viable gestures
+    """
+    #FIXME: Need to confirm that a list is produced from this (unlikely)
+    return list(s3Client.getObject(
         Bucket=commons.FACE_RECOG_BUCKET,
-        Key=f"users/{username}"
-    )
+        Name="gestureTraining/"
+    )["Body"])
 
 def analyseImage(image):
     """analyseImage() : Queries the latest AWS Custom Label model for the gesture metadata. I.e. Does this image contain a gesture and if so, which one is it most likely?
-    :param image: Image/bytes to scan for gestures
+    :param image: Image/bytes/s3-filepath to scan for gestures
     :return: JSON object containing the gesture with the highest confidence
     """
     try:
+        # The param given is a local file
         with open(image, "rb") as fileBytes:
             detectedLabels = rekogClient.detect_custom_labels(
                 Image={
@@ -50,14 +82,39 @@ def analyseImage(image):
                 ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
             )['CustomLabels']
     except OSError:
+        # The param given is are file bytes from an image
         print("[WARNING] Image file could not be found, it is likely we already have the image bytes...")
-        detectedLabels = rekogClient.detect_custom_labels(
-            Image={
-                'Bytes': image,
-            },
-            MinConfidence=70,
-            ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
-        )['CustomLabels']
+        try:
+            detectedLabels = rekogClient.detect_custom_labels(
+                Image={
+                    'Bytes': image,
+                },
+                MinConfidence=70,
+                ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
+            )['CustomLabels']
+        except Exception:
+            # The param given is a file path to an image in s3
+            print("[WARNING] Given parameter is not a local image or image bytes, likelihood we are dealing with an s3 object path...")
+            try:
+                detectedLabels = rekogClient.detect_custom_labels(
+                    Image={
+                        'S3Object': {
+                            'Bucket' : commons.FACE_RECOG_BUCKET,
+                            'Name' : image,
+                        }
+                    },
+                    MinConfidence=70,
+                    ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
+                )['CustomLabels']
+            except Exception as e:
+                # The param given is none of the above
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"{image} is an invalid object to analyse for custom labels or another exception occurred",
+                    content={ "ERROR" : e },
+                    code=7
+                )
+
 
     # Extract gesture with highest confidence (return None if no gesture found)
     try:
@@ -138,7 +195,7 @@ def checkForGestures(image):
             print(f"[SUCCESS] The latest model (created at {versionDetails['CreationTimestamp']} is already running!")
 
         # Analyse the given image
-        print(f"[INFO] Beginning analysis of image to see if it contains a gesture...")
+        print(f"[INFO] Beginning analysis of image to see if it contains a recognised gesture...")
         analysisResponse = analyseImage(image)
 
         if analysisResponse is not None:
@@ -220,7 +277,6 @@ def main(argv):
                     print(f"[SUCCESS] Correct gesture given for position {imageNum}! Checking next gesture...")
                     imageNum += 1
                 else:
-                    # TODO: Not sure if we should be printing this without using the commons lib
                     print(f"[WARNING] Image {imageNum} was not the right gesture or was in the wrong position in the user combination")
             else:
                 return commons.respond(
