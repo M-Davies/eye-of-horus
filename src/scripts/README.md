@@ -24,3 +24,6 @@ These scripts can be used with the accompanying website OR on their own via the 
 17. No recognised gesture was detected
 18. Gesture was detected but it was not in the user's combination and/or in in the right position of the user's combination
 19. Stream Timeout Failed To Fire
+20. Rule Violation: All gestures of the specific locktype are the same
+21. Rule Violation: The locking gesture is the same as the unlocking gesture
+22. Rule Violation: One gesture combination is the same as the other when reversed

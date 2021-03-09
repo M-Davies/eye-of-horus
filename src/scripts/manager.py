@@ -23,8 +23,10 @@ from face import compare_faces
 from gesture import gesture_recog
 import commons
 
+# GLOBALS
 s3Client = boto3.client('s3')
 rekogClient = boto3.client('rekognition')
+previousCombination = []
 
 def delete_file(fileName):
     """delete_file() : Deletes a S3 object file
@@ -100,8 +102,6 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
     else:
         objectName = f"users/{username}/{objectName}"
 
-    print(f"[INFO] S3 Object Path will be {objectName}")
-
     # Upload the file
     try:
         with open(fileName, "rb") as fileBytes:
@@ -136,7 +136,7 @@ def streamHandler(start):
         if startStreamRet != 0:
             return commons.respond(
                 messageType="ERROR",
-                message=f"Stream failed to start (CONTENT field is the exit code), see log for details",
+                message=f"Stream failed to start (see content for exit code), see log for details",
                 content={ "ERROR" : startStreamRet },
                 code=5
             )
@@ -170,12 +170,11 @@ def constructGestureFramework(imagePaths, username, locktype):
     :returns: A completed gestures.json config
     """
     position = 1
-    gestureConfig = {}
+    gestureConfig = {{}}
     for path in imagePaths:
         try:
-            s3ObjectPath = upload_file(path, username, locktype, f"{locktype}Gesture{position}")
-            print(f"[INFO] Gesture locking image ({path}) has been successfully uploaded for position {position}. Identifying gesture type...")
-            gestureType = gesture_recog.analyseImage(s3ObjectPath)['Name']
+            print(f"[INFO] Identifying gesture type for {path}")
+            gestureType = gesture_recog.analyseImage(path)['Name']
             if gestureType is not None:
                 print(f"[SUCCESS] Gesture type identified as {gestureType}")
             else:
@@ -188,16 +187,58 @@ def constructGestureFramework(imagePaths, username, locktype):
             gestureType = path
             print(f"[INFO] No image to upload ({gestureType} is the assumed name of the gesture type). Verifying this is a supported gesture type...")
             # We don't need to do this for a file as it is scanned for valid gestures during analysis
-            gestureTypes = gesture_recog.gestureTypeIsValid(gestureType)
+            gestureTypes = gesture_recog.getGestureTypes()
             if gestureType not in gestureTypes:
                 return commons.respond(
                     messageType="ERROR",
                     message=f"{gestureType} is not a valid gesture type. Valid gesture types = {gestureTypes.join(' ')}",
                     code=17
                 )
+            else:
+                print(f"[SUCCESS] Gesture type identified as {gestureType}")
 
-        gestureConfig[str(position)] = { "gesture" : gestureType, "path" : s3ObjectPath }
+        gestureConfig[locktype][str(position)] = { "gesture" : gestureType, "path" : path }
         position += 1
+
+    # Finally, verify we are not using bad "password" practices (e.g. all the same values)
+    print("[INFO] Checking combination meets rule requirements...")
+    userGestures = list(map(
+        lambda position, details: gestureConfig[locktype][position][details]["gesture"],
+        gestureConfig[locktype]
+    ))
+
+    # All gestures are the same in one combination
+    if len(set(userGestures)) == 1:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"All gestures for {locktype}ing combination are the same. Please specify at least one different gesture in your combination",
+            code=20
+        )
+
+    # Conduct tests against the previous gesture combination that was created
+    global previousCombination
+    if previousCombination != []:
+
+        # Both combinations are the same
+        if previousCombination == userGestures:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"The two gesture combinations are identical. Please ensure the combinations are different and not reversed versions of each other",
+                code=21
+            )
+
+        # One combination is the same as the other when reversed
+        if previousCombination.reverse() == userGestures or userGestures.reverse() == previousCombination:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"One gesture combination is the same as the other when reversed. Please ensure the combinations are different and not reversed versions of each other",
+                code=22
+            )
+    else:
+        # We only have one gesture so far. Copy the current one and run the extra tests when we start consturcting the 2nd combination
+        previousCombination = userGestures.copy()
+
+    print(f"[SUCCESS] {locktype}ing combination passed all rule restraints!")
     return gestureConfig
 
 #########
@@ -208,7 +249,7 @@ def main(argv):
 
     # Parse input parameters
     argumentParser = argparse.ArgumentParser(
-        description="S3 image manager. Allows for the creation or deletion of images inside S3.",
+        description="Welcome to the eye of horus facial and gesture recognition authentication system! Please see the command options below for the usage of this tool outside of a website environment.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     argumentParser.add_argument("-a", "--action",
@@ -219,7 +260,7 @@ def main(argv):
     )
     argumentParser.add_argument("-f", "--face",
         required=False,
-        help="Path to the jpg or png image file to use as your facial recognition face to compare against when streaming"
+        help="Path to the jpg or png image file to use as your facial recognition face to compare against when running the kinesis stream"
     )
     argumentParser.add_argument("-l", "--lock",
         required=False,
@@ -252,8 +293,15 @@ def main(argv):
 
     # Create a new user profile in the rekognition collection and s3
     if argDict.action == "create":
+        # Verify we have a face to create
+        if argDict.face is None:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"-f was not given. Please provide a face to be used in recognition for your account.",
+                code=13
+            )
         # Verify we have a lock and unlock gesture
-        if argDict.lock is [] and argDict.unlock is []:
+        if argDict.lock is None and argDict.unlock is None:
             return commons.respond(
                 messageType="ERROR",
                 message=f"-l or -u was not given. Please provide locking (-l) and unlocking (-u) gesture combinations so your user account can be created.",
@@ -267,6 +315,22 @@ def main(argv):
                 code=13
             )
 
+        print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
+
+        # uploadedImage will the objectName so no need to check if there is a user in this function
+        indexedImage = index_photo.add_face_to_collection(argDict.face)
+        print(f"[SUCCESS] {argDict.face} successfully indexed into Rekognition Collection.")
+
+        # Iterate over the lock and unlock image files, uploading them one a time while constructing our gestures.json
+        lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
+        unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
+        gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
+
+        # Finally, upload all the files featured in these processes (including the gesture config file)
+        print("[INFO] All tests passed and profiles constructing. Uploading metadata...")
+
+        # Upload face
+        # TODO: Figure out if indexing first is a bad idea as the collection will point to an image that may not exist anymore (as it would be in s3 but not nessassrilly in the users path)
         try:
             uploadedImage = upload_file(argDict.face, argDict.profile, None, argDict.name)
         except FileNotFoundError:
@@ -276,19 +340,13 @@ def main(argv):
                 code=8
             )
 
-        print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
+        # Upload gestures, adjusting the path of the config file to be s3 relative
+        for locktype in gestureConfig.keys():
+            for position, details in gestureConfig[locktype].items():
+                # FIXME: It might not be important but the file suffix is not provided for the s3name
+                gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
+                gestureConfig[locktype][position]["path"] = gestureObjectPath
 
-        # uploadedImage will the objectName so no need to check if there is a user in this function
-        indexedImage = index_photo.add_face_to_collection(uploadedImage)
-        print(f"[SUCCESS] {uploadedImage} successfully uploaded to S3 and indexed into the Rekognition Collection.")
-
-        # Iterate over the lock and unlock image files, uploading them one a time while constructing our gestures.json
-        lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
-        unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
-        gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
-
-        # Finally, upload our completed gestures.json
-        print("[INFO] Images have been successfully uploaded. Uploading config file...")
         try:
             s3Client.putObject(
                 Body=gestureConfig,
@@ -298,7 +356,7 @@ def main(argv):
         except Exception as e:
             return commons.respond(
                 messageType="ERROR",
-                message=f"Failed to upload the gesture configuration file",
+                message=f"Failed to upload the gesture configuration file. Gesture and face images have already been uploaded. Recommend you delete your user account with -a delete and try remaking it.",
                 content={ "ERROR" : e },
                 code=3
             )
@@ -317,7 +375,7 @@ def main(argv):
         if argDict.profile is None or "":
             return commons.respond(
                 messageType="ERROR",
-                message=f"No username was given to delete an image from. Specify a username with -u/--username",
+                message=f"-p was not specified. Please pass in a user account name to delete.",
                 code=13
             )
 
@@ -406,7 +464,7 @@ def main(argv):
         elif argDict.lock is None and argDict.unlock is None:
             return commons.respond(
                 messageType="ERROR",
-                message="Neither Lock (-l) or Unlock (-u) flags very given. Please specify one type of gesture combination to attempt authentication with.",
+                message="Neither Lock (-l) or Unlock (-u) flag was given. Please specify one type of gesture combination to attempt authentication with.",
                 code=13
             )
         # Otherwise, figure out if we are locking or unlocking
@@ -416,7 +474,6 @@ def main(argv):
             else:
                 locktype = "unlock"
 
-        # Set a higher default timeout for gesture recog as it will take longer
         if argDict.timeout != None:
             timeoutSecondsGesture = argDict.timeout
         print(f"[INFO] Running gesture recognition library to check for the correct {locktype}ing gestures performed in current stream (timing out after {timeoutSecondsGesture}s)...")
@@ -453,8 +510,8 @@ def main(argv):
             signal.signal(signal.SIGALRM, timeoutHandler)
             signal.alarm(timeoutSecondsGesture)
 
-            matchedGestures = 1
             # We're actually looking for 4 gestures as part of the pin but it's better user feedback to start at 1 rather than 0
+            matchedGestures = 1
             while(matchedGestures < 5):
 
                 # Capture frame-by-frame
@@ -463,27 +520,14 @@ def main(argv):
                 if ret is not False or frame is not None:
                     # Run gesture recog lib against captured frame
                     foundGesture = gesture_recog.checkForGestures(frame)
-                    if foundGesture is None:
-                        return commons.respond(
-                            messageType="ERROR",
-                            message=f"No recognised gesture was found within image {matchedGestures}",
-                            code=17
-                        )
+                    if foundGesture is not None:
+                        print(f"[INFO] Checking if {argDict.profile} contains the correct gesture for the {locktype} combination at position {matchedGestures}...")
+                        hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, matchedGestures)
 
-                    print(f"[INFO] Checking if {argDict.profile} contains the correct gesture for the {locktype} combination at position {matchedGestures}...")
-                    hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, matchedGestures)
-
-                    # User has gesture and it's at the right position
-                    if hasGesture is True:
-                        print(f"[SUCCESS] Correct gesture given for position {matchedGestures}! Checking next gesture...")
-                        matchedGestures += 1
-                        continue
-                    else:
-                        return commons.respond(
-                            messageType="ERROR",
-                            message=f"Image for position {matchedGestures} was not the right gesture or the wrong position in the user combination.",
-                            code=18
-                        )
+                        # User has gesture and it's at the right position
+                        if hasGesture is True:
+                            print(f"[SUCCESS] Correct gesture given for position {matchedGestures}! Checking next gesture...")
+                            matchedGestures += 1
                 else:
                     return commons.respond(
                         messageType="ERROR",
@@ -495,7 +539,7 @@ def main(argv):
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
             signal.alarm(0)
 
-            if matchedGestures is 5:
+            if matchedGestures == 5:
                 return commons.respond(
                     messageType="SUCCESS",
                     message=f"Matched {locktype} gesture combination for user {argDict.profile}",
@@ -513,7 +557,7 @@ def main(argv):
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             return commons.respond(
                 messageType="ERROR",
-                message=f"TIMEOUT FIRED AFTER {timeoutSecondsGesture}s, CORRECT GESTURE COMBINATION WAS NOT FOUND IN THE STREAM!",
+                message=f"Timeout fired after {timeoutSecondsGesture}s, correct gesture was not found in the stream",
                 code=10
             )
         finally:

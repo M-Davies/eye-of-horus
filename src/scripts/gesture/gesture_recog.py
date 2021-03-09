@@ -49,8 +49,7 @@ def inUserCombination(gestureJson, username, locktype, position):
             code=2
         )
 
-    # Is the label position a match for the gesture detected?
-    print(f"[INFO] Gesture config file for {username} has been retrieved. Checking if detected gesture is in {locktype}ing combination at position {position}...")
+    # Is the stored gesture type and position a match for the detected gesture type and position?
     if gestureConfig[locktype][position]["gesture"] == gestureJson["Name"]:
         return True
     else:
@@ -76,7 +75,7 @@ def analyseImage(image):
         with open(image, "rb") as fileBytes:
             detectedLabels = rekogClient.detect_custom_labels(
                 Image={
-                    'Bytes': fileBytes,
+                    'Bytes': fileBytes.read(),
                 },
                 MinConfidence=70,
                 ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
@@ -115,8 +114,7 @@ def analyseImage(image):
                     code=7
                 )
 
-
-    # Extract gesture with highest confidence (return None if no gesture found)
+    # Extract gesture with highest confidence (or None if no gesture found)
     try:
         return max(detectedLabels, key = lambda ev: ev["Confidence"])
     except ValueError:
@@ -148,11 +146,12 @@ def checkForGestures(image):
     # Verify that the latest rekognition model is running
     print(f"[INFO] Checking if {commons.GESTURE_RECOG_PROJECT_NAME} has already been started...")
 
+    # FIXME: It doesn't make sense to stop and start the model when running from a streaming perspective
     try:
         # Only bother retrieving the newest version
         versionDetails = getProjectVersions()[0]
 
-        if (versionDetails["Status"] is not "RUNNING"):
+        if (versionDetails["Status"] != "RUNNING"):
             print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} is not running. Starting latest model for this project (created at {versionDetails['CreationTimestamp']}) now...")
 
             # Start it and wait to be in a usable state
@@ -199,10 +198,11 @@ def checkForGestures(image):
         analysisResponse = analyseImage(image)
 
         if analysisResponse is not None:
+            # Found a gesture!
             print(f"[SUCCESS] Found a gesture!\n{analysisResponse}")
             return analysisResponse
         else:
-            # Just return None and leave the error handling to the caller
+            # Otherwise return and leave error handling to caller
             return None
 
     # Stop the model after recog is complete
@@ -223,7 +223,7 @@ def checkForGestures(image):
 
         # Verify model was actually stopped
         stoppedModel = getProjectVersions()[0]
-        if stoppedModel["Status"] is not "RUNNING":
+        if stoppedModel["Status"] != "RUNNING":
             print(f"[SUCCESS] {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully stopped!")
         else:
             commons.respond(

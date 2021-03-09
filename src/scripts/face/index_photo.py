@@ -33,6 +33,7 @@ def faceInCollection(faceId):
             print(f"[INFO] {faceId} found with object name {faceId} (id = {face['FaceId']}). Face to be deleted:\n{face}")
             foundFace = dict(face)
             break
+
     return foundFace
 
 def remove_face_from_collection(imageId):
@@ -116,17 +117,24 @@ def add_face_to_collection(imagePath, s3Name=None):
     else:
         # Use an S3 object if no file was found at the image path given
         print(f"[WARNING] {imagePath} does not exist as a local file. Attempting to retrieve the image using the same path from S3 with object name {objectName}")
-        response = client.index_faces(
-            CollectionId = commons.FACE_RECOG_COLLECTION,
-            Image = { 'S3Object' : {
-                'Bucket' : commons.FACE_RECOG_BUCKET,
-                'Name' : imagePath
-            } },
-            ExternalImageId = objectName,
-            MaxFaces = 1,
-            QualityFilter = "AUTO",
-            DetectionAttributes = ['ALL']
-        )
+        try:
+            response = client.index_faces(
+                CollectionId = commons.FACE_RECOG_COLLECTION,
+                Image = { 'S3Object' : {
+                    'Bucket' : commons.FACE_RECOG_BUCKET,
+                    'Name' : imagePath
+                } },
+                ExternalImageId = objectName,
+                MaxFaces = 1,
+                QualityFilter = "AUTO",
+                DetectionAttributes = ['ALL']
+            )
+        except client.exceptions.InvalidS3ObjectException:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"No such file found locally or in S3: {imagePath}",
+                code=9
+            )
 
     # We're only looking to return one face
     print(f"[SUCCESS] {imagePath} was successfully add to the collection with image id {objectName}")
