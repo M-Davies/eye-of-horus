@@ -6,12 +6,15 @@
 # -----------------------------------------------------------
 
 import boto3
+from botocore.exceptions import WaiterError
 rekogClient = boto3.client('rekognition')
 s3Client = boto3.client('s3')
 
 import sys
 import os
 import argparse
+import time
+from pathlib import Path
 
 from PIL import Image
 
@@ -45,7 +48,7 @@ def inUserCombination(gestureJson, username, locktype, position):
         return commons.respond(
             messageType="ERROR",
             message="Failed to retrieve user gesture config file. Please check your internet connection.",
-            content={ "ERROR" : e },
+            content={ "ERROR" : str(e) },
             code=2
         )
 
@@ -65,14 +68,16 @@ def getGestureTypes():
         Name="gestureTraining/"
     )["Body"])
 
-def analyseImage(image):
-    """analyseImage() : Queries the latest AWS Custom Label model for the gesture metadata. I.e. Does this image contain a gesture and if so, which one is it most likely?
-    :param image: Image/bytes/s3-filepath to scan for gestures
-    :return: JSON object containing the gesture with the highest confidence
+def checkForGestures(image):
+    """checkForGestures() : Queries the latest AWS Custom Label model for the gesture metadata. I.e. Does this image contain a gesture and if so, which one is it most likely?
+    :param image: Locally stored image OR image bytes OR stream frame to scan for authentication gestures
+    :return: JSON object containing the gesture with the highest confidence OR None if no recognised gesture was found
     """
+    print(f"[INFO] Beginning analysis of image to see if it contains a recognised gesture...")
     try:
         # The param given is a local file
         with open(image, "rb") as fileBytes:
+            # This may throw a ImageTooLargeException as the max allowed by AWS in byte format is 4mb (we let the caller deal with that)
             detectedLabels = rekogClient.detect_custom_labels(
                 Image={
                     'Bytes': fileBytes.read(),
@@ -110,14 +115,17 @@ def analyseImage(image):
                 return commons.respond(
                     messageType="ERROR",
                     message=f"{image} is an invalid object to analyse for custom labels or another exception occurred",
-                    content={ "ERROR" : e },
+                    content={ "ERROR" : str(e) },
                     code=7
                 )
 
     # Extract gesture with highest confidence (or None if no gesture found)
-    try:
-        return max(detectedLabels, key = lambda ev: ev["Confidence"])
-    except ValueError:
+    foundGesture = max(detectedLabels, key = lambda ev: ev["Confidence"])
+    if foundGesture is not None:
+        print(f"[SUCCESS] Found a gesture!\n{foundGesture}")
+        return foundGesture
+    else:
+        # Return None if no gesture found, leaving handling to caller
         return None
 
 def getProjectVersions():
@@ -135,24 +143,24 @@ def getProjectVersions():
         return commons.respond(
             messageType="ERROR",
             message="Failed to retrieve project version descriptions. Please check your internet connection and .env file.",
-            content={ "ERROR" : e },
+            content={ "ERROR" : str(e) },
             code=2
         )
 
-def checkForGestures(image):
-    """checkForGestures() : Entry point for the manager, this sets up the latest rekognition model and runs AWS custom labels against the given image
-    :param image: Locally stored image OR stream frame to scan for authentication gestures
+def projectHandler(start):
+    """projectHandler() : Starts or stops the custom labels project in AWS. It will wait for the project to boot up after starting and will verify the project actually stopped after stopping.
+    :param start: Boolean denoting whether we are starting or stopping the project
+    :return: Error code and execution exit if request failed. True otherwwise.
     """
-    # Verify that the latest rekognition model is running
-    print(f"[INFO] Checking if {commons.GESTURE_RECOG_PROJECT_NAME} has already been started...")
+    # Only bother retrieving the newest version
+    versionDetails = getProjectVersions()[0]
 
-    # FIXME: It doesn't make sense to stop and start the model when running from a streaming perspective
-    try:
-        # Only bother retrieving the newest version
-        versionDetails = getProjectVersions()[0]
+    if start:
+        # Verify that the latest rekognition model is running
+        print(f"[INFO] Checking if {commons.GESTURE_RECOG_PROJECT_NAME} has already been started...")
 
-        if (versionDetails["Status"] != "RUNNING"):
-            print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} is not running. Starting latest model for this project (created at {versionDetails['CreationTimestamp']}) now...")
+        if (versionDetails["Status"] == "STOPPED"):
+            print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} is not running. Starting latest model for this project (created at {versionDetails['CreationTimestamp']}) now...")
 
             # Start it and wait to be in a usable state
             try:
@@ -160,78 +168,117 @@ def checkForGestures(image):
                     ProjectVersionArn=os.getenv("LATEST_MODEL_ARN"),
                     MinInferenceUnits=1 # Stick to one unit to save money
                 )
+            except rekogClient.exceptions.ResourceInUseException as e:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"Failed to start {commons.GESTURE_RECOG_PROJECT_NAME}. System is in use (e.g. starting or stopping).",
+                    code=14
+                )
             except Exception as e:
                 return commons.respond(
                     messageType="ERROR",
                     message=f"Failed to start {commons.GESTURE_RECOG_PROJECT_NAME}.",
-                    content={ "ERROR" : e },
+                    content={ "ERROR" : str(e) },
                     code=14
                 )
 
-            print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} has been started. Waiting for confirmation from AWS...")
+            # 900 seconds = 15mins
+            delay = 25
+            maxAttempts = 36
+            timeoutSeconds = delay * maxAttempts
 
+            print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
             waitHandler = rekogClient.get_waiter('project_version_running')
-            # Check every 5 seconds for 1min to get it done quick
             try:
                 waitHandler.wait(
                     ProjectArn=os.getenv("PROJECT_ARN"),
                     WaiterConfig={
-                        "Delay" : 5,
-                        "MaxAttempts" : 12
+                        "Delay" : delay,
+                        "MaxAttempts" : maxAttempts
                     }
                 )
-            except Exception as e:
+            except WaiterError:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly within 1min",
-                    content={ "ERROR" : e },
+                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly before {timeoutSeconds}s timeout expired",
                     code=15
                 )
 
             print(f"[SUCCESS] Model {versionDetails['CreationTimestamp']} is running!")
+            return True
+        elif versionDetails["Status"] == "STOPPING":
+            return commons.respond(
+                messageType="ERROR",
+                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is stopping. Please check again later when the process is not busy...",
+                code=23
+            )
+        elif versionDetails["Status"] == "STARTING":
+            return commons.respond(
+                messageType="ERROR",
+                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is starting. Please check again later when the process is complete...",
+                code=23
+            )
         else:
-            # Model is already running (unlikely but possible if the finally statement failed)
+            # Model is already running
             print(f"[SUCCESS] The latest model (created at {versionDetails['CreationTimestamp']} is already running!")
-
-        # Analyse the given image
-        print(f"[INFO] Beginning analysis of image to see if it contains a recognised gesture...")
-        analysisResponse = analyseImage(image)
-
-        if analysisResponse is not None:
-            # Found a gesture!
-            print(f"[SUCCESS] Found a gesture!\n{analysisResponse}")
-            return analysisResponse
-        else:
-            # Otherwise return and leave error handling to caller
-            return None
+            return True
 
     # Stop the model after recog is complete
-    finally:
-        print(f"[INFO] Stopping latest {commons.GESTURE_RECOG_PROJECT_NAME} model...")
+    else:
+        if (versionDetails["Status"] == "RUNNING"):
+            print(f"[INFO] Stopping latest {commons.GESTURE_RECOG_PROJECT_NAME} model...")
+            try:
+                rekogClient.stop_project_version(
+                    ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
+                )
+            except Exception as e:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"Failed to stop the latest model of {commons.GESTURE_RECOG_PROJECT_NAME}",
+                    content={ "ERROR" : str(e) },
+                    code=15
+                )
 
-        try:
-            rekogClient.stop_project_version(
-                ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
-            )
-        except Exception as e:
-            commons.respond(
+            # Verify model was actually stopped
+            versionDetails = getProjectVersions()[0]
+            if versionDetails["Status"] != "RUNNING":
+                # Stopping a model takes less time than starting one
+                stopTimeout = 120
+                print(f"[INFO] Request to stop {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
+                time.sleep(stopTimeout)
+
+                if (versionDetails["Status"] == "STOPPED"):
+                    print(f"[SUCCESS] {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully stopped!")
+                    return True
+                else:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to stop properly before {stopTimeout}s timeout expired",
+                        content={ "STATUS" : versionDetails["Status"] },
+                        code=15
+                    )
+            else:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} stop request was successfull but the latest model is still running.",
+                    content={ "MODEL" :  versionDetails['CreationTimestamp'], "STATUS" : versionDetails['Status'] },
+                    code=1
+                )
+        elif versionDetails["Status"] == "STARTING":
+            return commons.respond(
                 messageType="ERROR",
-                message=f"Failed to stop the latest model of {commons.GESTURE_RECOG_PROJECT_NAME}",
-                content={ "ERROR" : e },
-                code=15
+                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is starting. Please check again later when the process is not busy...",
+                code=23
             )
-
-        # Verify model was actually stopped
-        stoppedModel = getProjectVersions()[0]
-        if stoppedModel["Status"] != "RUNNING":
-            print(f"[SUCCESS] {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully stopped!")
+        elif versionDetails["Status"] == "STOPPING":
+            return commons.respond(
+                messageType="ERROR",
+                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is stopping. Please check again later when the process is complete...",
+                code=23
+            )
         else:
-            commons.respond(
-                messageType="ERROR",
-                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} stop request was successfull but the latest model is still running.",
-                content={ "MODEL" :  stoppedModel['CreationTimestamp'], "STATUS" : stoppedModel['Status'] },
-                code=1
-            )
+            print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} model is already stopped!")
+            return True
 
 def main(argv):
     """main() : Main method that parses the input opts and returns the result"""
@@ -240,57 +287,81 @@ def main(argv):
         description="Runs gesture recognition of an image or video frame against an image and has the option of exapnding it to check if a specific user possesses said gesture",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    argumentParser.add_argument("-f", "--files",
+    argumentParser.add_argument("-a", "--action",
         required=True,
+        choices=["gesture", "start", "stop"],
+        help="""Only one action can be performed at one time:\n\gesture: Runs gesture recognition analysis against a set of images (paths seperated by spaces).\n\start: Starts the rekognition project\n\stop: Stops the rekognition project.
+        """
+    )
+    argumentParser.add_argument("-f", "--files",
+        required=False,
         action="extend",
         nargs="+",
-        help="List of full paths (seperated by spaces) to a JPG or PNG image file that contain a gesture you would like to evaluate"
-    )
-    argumentParser.add_argument("-u", "--username",
-        required=False,
-        help="Username to retrieve the gestures from AWS for comparison with the gestures performed in the image. This is optional, you may opt out of this param if you only wish to check if your image contains a supported gesture."
+        help="List of full paths (seperated by spaces) to a gesture combination (in order) that you would like to analyse."
     )
     argDict = argumentParser.parse_args()
 
-    # Iterate through given images
-    imageNum = 1
-    for imagePath in argDict.files:
-        # We will always be using a local file (or it's file bytes) so no need to check if in s3 or not here
-        if os.path.isfile(imagePath):
-            try:
-                Image.open(imagePath)
-            except IOError:
-                commons.respond(
-                    messageType="ERROR",
-                    message=f"File {imagePath} exists but is not an image. Only jpg and png files are valid",
-                    code=7
-                )
-            foundGesture = checkForGestures(imagePath)
+    if argDict.action == "gesture":
+        # Start Rekog project
+        projectHandler(True)
 
-            # We have found a gesture, let's see if the user has one that matches
-            if argDict.username != None:
-                print(f"[INFO] Checking if {argDict.username} contains the identified gesture...")
-                userHasGesture = inUserCombination(foundGesture, argDict.username, imageNum)
+        # Iterate through given images
+        try:
+            imageNum = 1
+            for imagePath in argDict.files:
+                # We will always be using a local file (or it's file bytes) so no need to check if in s3 or not here
+                if os.path.isfile(imagePath):
+                    try:
+                        Image.open(imagePath)
+                    except IOError:
+                        return commons.respond(
+                            messageType="ERROR",
+                            message=f"File {imagePath} exists but is not an image. Only jpg and png files are valid",
+                            code=7
+                        )
+                    foundGesture = checkForGestures(imagePath)
 
-                # User has gesture and it's at the right position
-                if userHasGesture is True:
-                    print(f"[SUCCESS] Correct gesture given for position {imageNum}! Checking next gesture...")
-                    imageNum += 1
+                    # We have found a gesture
+                    if foundGesture is not None:
+                        commons.respond(
+                            messageType="SUCCESS",
+                            message=f"Found a gesture in the image!",
+                            content=foundGesture,
+                            code=0
+                        )
+                        continue
+                    else:
+                        print(f"[WARNING] No gesture was found within {imagePath} (Available gestures = {getGestureTypes()}")
+                        continue
                 else:
-                    print(f"[WARNING] Image {imageNum} was not the right gesture or was in the wrong position in the user combination")
-            else:
-                return commons.respond(
-                    messageType="SUCCESS",
-                    message=f"Found a gesture within the target image!",
-                    content=foundGesture,
-                    code=0
-                )
-        else:
-            commons.respond(
-                messageType="ERROR",
-                message=f"No such file {argDict.file}",
-                code=8
-            )
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"No such file {argDict.file}",
+                        code=8
+                    )
+        finally:
+            projectHandler(False)
+
+    elif argDict.action == "start":
+        projectHandler(True)
+        return commons.respond(
+            messageType="SUCCESS",
+            message="Latest project model is now running!",
+            code=0
+        )
+    elif argDict.action == "stop":
+        projectHandler(False)
+        return commons.respond(
+            messageType="SUCCESS",
+            message="Latest project model is now stopped!",
+            code=0
+        )
+    else:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"Invalid action type - {argDict.action}",
+            code=13
+        )
 
 if __name__ == "__main__":
     main(sys.argv[1:])

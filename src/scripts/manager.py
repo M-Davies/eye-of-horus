@@ -35,6 +35,7 @@ def delete_file(fileName):
     """
 
     try:
+        print("[INFO] Deleting...")
         s3Client.delete_object(
             Bucket = commons.FACE_RECOG_BUCKET,
             Key = fileName
@@ -76,6 +77,9 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
     :param s3Name: S3 object name and or path. If not specified then the filename is used
     :return: S3 object path to the uploaded object
     """
+    # This is appended to an error messsage in case the user is creating an account and something goes wrong
+    errorSuffix = "WARNING: If you are executing this via manager.py -a create your profile has been partially created on s3. To ensure you do not suffer hard to debug problems, please ensure you delete your profile with -a delete before trying -a create again"
+
     # Verify file exists
     if os.path.isfile(fileName):
         try:
@@ -83,7 +87,7 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
         except IOError:
             return commons.respond(
                 messageType="ERROR",
-                message=f"File {fileName} exists but is not an image. Only jpg and png files are valid",
+                message=f"File {fileName} exists but is not an image. Only jpg and png files are valid. {errorSuffix}",
                 code=7
             )
     else:
@@ -104,6 +108,7 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
 
     # Upload the file
     try:
+        print("[INFO] Uploading...")
         with open(fileName, "rb") as fileBytes:
             response = s3Client.upload_fileobj(
                 Fileobj = fileBytes,
@@ -113,21 +118,22 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
     except ClientError as e:
         return commons.respond(
             messageType="ERROR",
-            message=f"{fileName} FAILED to upload to S3",
-            content={ "ERROR" : e },
+            message=f"{fileName} FAILED to upload to S3. {errorSuffix}",
+            content={ "ERROR" : str(e) },
             code=3
         )
-    except EndpointConnectionError:
+    except EndpointConnectionError as e:
         return commons.respond(
             messageType="ERROR",
-            message="FAILED to upload to S3. Could not establish a connection to AWS",
+            message=f"{fileName} FAILED to upload to S3. Could not establish a connection to AWS. {errorSuffix}",
+            content={ "ERROR" : str(e) },
             code=3
         )
 
     return objectName
 
 def streamHandler(start):
-    """streamHandler() : Starts the live stream to AWS, contained within a finally block that will execute on function completion.
+    """streamHandler() : Starts or stops the live stream to AWS, sleeping after starting briefly to allow it to get situated. It will also check the error codes of the respective start and stop shell scripts to verify the stream actually started/stopped.
     :param start: Boolean denoting whether we are starting or stopping the stream
     """
     if start:
@@ -137,7 +143,7 @@ def streamHandler(start):
             return commons.respond(
                 messageType="ERROR",
                 message=f"Stream failed to start (see content for exit code), see log for details",
-                content={ "ERROR" : startStreamRet },
+                content={ "ERROR" : str(startStreamRet) },
                 code=5
             )
         else:
@@ -151,7 +157,7 @@ def streamHandler(start):
             return commons.respond(
                 messageType="ERROR",
                 message=f"Stream failed to die (see CONTENT field is the exit code), see log for details",
-                content={ "ERROR" : stopStreamRet },
+                content={ "ERROR" : str(stopStreamRet) },
                 code=6
             )
 
@@ -170,11 +176,18 @@ def constructGestureFramework(imagePaths, username, locktype):
     :returns: A completed gestures.json config
     """
     position = 1
-    gestureConfig = {{}}
+    gestureConfig = {}
     for path in imagePaths:
         try:
             print(f"[INFO] Identifying gesture type for {path}")
-            gestureType = gesture_recog.analyseImage(path)['Name']
+            try:
+                gestureType = gesture_recog.checkForGestures(path)['Name']
+            except rekogClient.exceptions.ImageTooLargeException:
+                print(f"[WARNING] {path} is too large (>4MB) to check for gestures directly. Uploading to S3 first and then checking for gestures.")
+                # Sometimes this will time out on a first file upload
+                gestureObjectPath = upload_file(path, username, locktype, f"{locktype.capitalize()}Gesture{position}")
+                gestureType = gesture_recog.checkForGestures(gestureObjectPath)['Name']
+
             if gestureType is not None:
                 print(f"[SUCCESS] Gesture type identified as {gestureType}")
             else:
@@ -185,7 +198,7 @@ def constructGestureFramework(imagePaths, username, locktype):
                 )
         except FileNotFoundError:
             gestureType = path
-            print(f"[INFO] No image to upload ({gestureType} is the assumed name of the gesture type). Verifying this is a supported gesture type...")
+            print(f"[WARNING] No image to upload ({gestureType} is the assumed name of the gesture type). Verifying this is a supported gesture type...")
             # We don't need to do this for a file as it is scanned for valid gestures during analysis
             gestureTypes = gesture_recog.getGestureTypes()
             if gestureType not in gestureTypes:
@@ -197,14 +210,15 @@ def constructGestureFramework(imagePaths, username, locktype):
             else:
                 print(f"[SUCCESS] Gesture type identified as {gestureType}")
 
-        gestureConfig[locktype][str(position)] = { "gesture" : gestureType, "path" : path }
+        # We leave path empty for now as it's updated when we uploaded the files
+        gestureConfig[str(position)] = { "gesture" : gestureType, "path" : "" }
         position += 1
 
     # Finally, verify we are not using bad "password" practices (e.g. all the same values)
     print("[INFO] Checking combination meets rule requirements...")
     userGestures = list(map(
-        lambda position, details: gestureConfig[locktype][position][details]["gesture"],
-        gestureConfig[locktype]
+        lambda position: gestureConfig[position]["gesture"],
+        gestureConfig
     ))
 
     # All gestures are the same in one combination
@@ -218,7 +232,6 @@ def constructGestureFramework(imagePaths, username, locktype):
     # Conduct tests against the previous gesture combination that was created
     global previousCombination
     if previousCombination != []:
-
         # Both combinations are the same
         if previousCombination == userGestures:
             return commons.respond(
@@ -255,7 +268,7 @@ def main(argv):
     argumentParser.add_argument("-a", "--action",
         required=True,
         choices=["create", "delete", "compare", "gesture"],
-        help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout\n\ngesture: Starts streaming and executes the gesture comparison library against the user --profile.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
+        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout\n\ngesture: Starts streaming and executes the gesture comparison library against the user --profile.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--face",
@@ -265,12 +278,14 @@ def main(argv):
     argumentParser.add_argument("-l", "--lock",
         required=False,
         action="extend",
-        help="Two options for this command:\n1) FOR -a create = 4 Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to lock their system using their lock gesture pattern"
+        nargs="+",
+        help="Two options for this command:\n1) FOR -a create = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to lock their system using their lock gesture pattern"
     )
     argumentParser.add_argument("-u", "--unlock",
         required=False,
         action="extend",
-        help="Two options for this command:\n1)FOR -a create = 4 Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to unlock their system using their unlock gesture pattern"
+        nargs="+",
+        help="Two options for this command:\n1)FOR -a create = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination when streaming\n2) FOR -a gesture = No parameters. Simply specify this param to declare that the user --profile wishes to attempt to unlock their system using their unlock gesture pattern"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -287,9 +302,14 @@ def main(argv):
         required=False,
         help="Username to perform -a create,delete,compare action upon. Result depends on the action chosen"
     )
+    argumentParser.add_argument("-m", "--maintain",
+        action="store_true",
+        required=False,
+        help="If this parameter is set, the gesture recognition project will not be closed after rekognition is complete (only applicable with -a create,gesture"
+    )
     argDict = argumentParser.parse_args()
     print("[INFO] Parsed arguments:")
-    print(argDict)
+    print(f"{argDict}\n")
 
     # Create a new user profile in the rekognition collection and s3
     if argDict.action == "create":
@@ -315,16 +335,21 @@ def main(argv):
                 code=13
             )
 
-        print(f"[INFO] Indexing photo into {commons.FACE_RECOG_COLLECTION}")
-
         # uploadedImage will the objectName so no need to check if there is a user in this function
         indexedImage = index_photo.add_face_to_collection(argDict.face)
-        print(f"[SUCCESS] {argDict.face} successfully indexed into Rekognition Collection.")
 
-        # Iterate over the lock and unlock image files, uploading them one a time while constructing our gestures.json
-        lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
-        unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
-        gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
+        # First, start the rekog project so we can actually analyse the given images
+        gesture_recog.projectHandler(True)
+
+        try:
+            # Now iterate over lock and unlock image files, processing one a time while constructing our gestures.json
+            lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
+            unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
+            gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
+        finally:
+            # Finally, close down the rekog project if specified
+            if argDict.maintain is False:
+                gesture_recog.projectHandler(False)
 
         # Finally, upload all the files featured in these processes (including the gesture config file)
         print("[INFO] All tests passed and profiles constructing. Uploading metadata...")
@@ -357,7 +382,7 @@ def main(argv):
             return commons.respond(
                 messageType="ERROR",
                 message=f"Failed to upload the gesture configuration file. Gesture and face images have already been uploaded. Recommend you delete your user account with -a delete and try remaking it.",
-                content={ "ERROR" : e },
+                content={ "ERROR" : str(e) },
                 code=3
             )
 
@@ -478,6 +503,9 @@ def main(argv):
             timeoutSecondsGesture = argDict.timeout
         print(f"[INFO] Running gesture recognition library to check for the correct {locktype}ing gestures performed in current stream (timing out after {timeoutSecondsGesture}s)...")
 
+        # Start rekognition model so it is ready for when we start streaming
+        gesture_recog.projectHandler(True)
+
         # Start/end stream
         streamHandler(True)
 
@@ -528,11 +556,12 @@ def main(argv):
                         if hasGesture is True:
                             print(f"[SUCCESS] Correct gesture given for position {matchedGestures}! Checking next gesture...")
                             matchedGestures += 1
+                            continue
                 else:
                     return commons.respond(
                         messageType="ERROR",
                         message="Stream Interrupted or corrupted!",
-                        content={ "EXIT" : 12, "RETURN VALUE" : ret },
+                        content={ "EXIT" : 12, "RETURN VALUE" : str(ret) },
                         code=12
                     )
 
@@ -564,6 +593,9 @@ def main(argv):
             # Reset/stop timer everytime
             signal.signal(signal.SIGALRM, signal.SIG_DFL)
             streamHandler(False)
+
+            if argDict.maintain is False:
+                gesture_recog.projectHandler(False)
 
             # When everything done, release the capture
             vcap.release()

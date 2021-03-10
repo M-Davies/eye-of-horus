@@ -137,7 +137,7 @@ def add_face_to_collection(imagePath, s3Name=None):
             )
 
     # We're only looking to return one face
-    print(f"[SUCCESS] {imagePath} was successfully add to the collection with image id {objectName}")
+    print(f"[SUCCESS] {imagePath} was successfully added to the collection with image id {objectName}")
     return json.dumps(response['FaceRecords'][0])
 
 #########
