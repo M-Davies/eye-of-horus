@@ -8,6 +8,7 @@
 import boto3
 from botocore.exceptions import ClientError
 from botocore.exceptions import EndpointConnectionError
+from boto3.s3.transfer import TransferConfig
 
 import cv2
 import sys
@@ -16,6 +17,7 @@ import os
 import time
 import subprocess
 import signal
+import json
 from PIL import Image
 
 from face import index_photo
@@ -26,7 +28,6 @@ import commons
 # GLOBALS
 s3Client = boto3.client('s3')
 rekogClient = boto3.client('rekognition')
-previousCombination = []
 
 def delete_file(fileName):
     """delete_file() : Deletes a S3 object file
@@ -102,18 +103,24 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
 
     # For gestures include the locktype folder path
     if locktype is not None:
-        objectName = f"users/{username}/{locktype}/{objectName}"
+        objectName = f"users/{username}/gestures/{locktype}/{objectName}"
     else:
         objectName = f"users/{username}/{objectName}"
 
     # Upload the file
     try:
-        print("[INFO] Uploading...")
+        print(f"[INFO] Uploading {fileName}...")
+        # Sometimes this will time out on a first file upload
         with open(fileName, "rb") as fileBytes:
             response = s3Client.upload_fileobj(
-                Fileobj = fileBytes,
-                Bucket = commons.FACE_RECOG_BUCKET,
-                Key = objectName
+                Fileobj=fileBytes,
+                Bucket=commons.FACE_RECOG_BUCKET,
+                Key=objectName,
+                Config=TransferConfig(
+                    multipart_threshold=16777216,
+                    max_concurrency=20,
+                    num_download_attempts=10
+                )
             )
     except ClientError as e:
         return commons.respond(
@@ -168,11 +175,12 @@ def timeoutHandler(signum, stackFrame):
     """
     raise TimeoutError
 
-def constructGestureFramework(imagePaths, username, locktype):
+def constructGestureFramework(imagePaths, username, locktype, previousFramework=None):
     """constructGestureFramework() : Uploads gesture recognition images and config file to the user's S3 folder
     :param imagePaths: List of images paths or gesture types (in combination order)
     :param username: Username as per their s3 folder
     :param locktype: Either lock or unlock (usually), depicts which combination the images are a part of
+    :param previousFramework: If a framework has already been created, we will run tests against both it and the soon to be created framework in tandem
     :returns: A completed gestures.json config
     """
     position = 1
@@ -184,8 +192,14 @@ def constructGestureFramework(imagePaths, username, locktype):
                 gestureType = gesture_recog.checkForGestures(path)['Name']
             except rekogClient.exceptions.ImageTooLargeException:
                 print(f"[WARNING] {path} is too large (>4MB) to check for gestures directly. Uploading to S3 first and then checking for gestures.")
-                # Sometimes this will time out on a first file upload
-                gestureObjectPath = upload_file(path, username, locktype, f"{locktype.capitalize()}Gesture{position}")
+                try:
+                    gestureObjectPath = upload_file(path, username, locktype, f"{locktype.capitalize()}Gesture{position}")
+                except FileNotFoundError:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"Could no longer find file {path}",
+                        code=8
+                    )
                 gestureType = gesture_recog.checkForGestures(gestureObjectPath)['Name']
 
             if gestureType is not None:
@@ -211,7 +225,7 @@ def constructGestureFramework(imagePaths, username, locktype):
                 print(f"[SUCCESS] Gesture type identified as {gestureType}")
 
         # We leave path empty for now as it's updated when we uploaded the files
-        gestureConfig[str(position)] = { "gesture" : gestureType, "path" : "" }
+        gestureConfig[str(position)] = { "gesture" : gestureType, "path" : path }
         position += 1
 
     # Finally, verify we are not using bad "password" practices (e.g. all the same values)
@@ -230,10 +244,13 @@ def constructGestureFramework(imagePaths, username, locktype):
         )
 
     # Conduct tests against the previous gesture combination that was created
-    global previousCombination
-    if previousCombination != []:
+    if previousFramework is not None:
+        previousGestures = list(map(
+            lambda position: previousFramework[position]["gesture"],
+            previousFramework
+        ))
         # Both combinations are the same
-        if previousCombination == userGestures:
+        if previousGestures == userGestures:
             return commons.respond(
                 messageType="ERROR",
                 message=f"The two gesture combinations are identical. Please ensure the combinations are different and not reversed versions of each other",
@@ -241,17 +258,14 @@ def constructGestureFramework(imagePaths, username, locktype):
             )
 
         # One combination is the same as the other when reversed
-        if previousCombination.reverse() == userGestures or userGestures.reverse() == previousCombination:
+        if previousGestures.reverse() == userGestures or userGestures.reverse() == previousGestures:
             return commons.respond(
                 messageType="ERROR",
                 message=f"One gesture combination is the same as the other when reversed. Please ensure the combinations are different and not reversed versions of each other",
                 code=22
             )
-    else:
-        # We only have one gesture so far. Copy the current one and run the extra tests when we start consturcting the 2nd combination
-        previousCombination = userGestures.copy()
 
-    print(f"[SUCCESS] {locktype}ing combination passed all rule restraints!")
+    print(f"[SUCCESS] {locktype.capitalize()}ing combination passed all rule restraints!")
     return gestureConfig
 
 #########
@@ -344,7 +358,7 @@ def main(argv):
         try:
             # Now iterate over lock and unlock image files, processing one a time while constructing our gestures.json
             lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
-            unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
+            unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock", lockGestureConfig)
             gestureConfig = { "lock" : lockGestureConfig, "unlock" : unlockGestureConfig }
         finally:
             # Finally, close down the rekog project if specified
@@ -352,10 +366,9 @@ def main(argv):
                 gesture_recog.projectHandler(False)
 
         # Finally, upload all the files featured in these processes (including the gesture config file)
-        print("[INFO] All tests passed and profiles constructing. Uploading metadata...")
+        print("[INFO] All tests passed and profiles constructing. Uploading face...")
 
         # Upload face
-        # TODO: Figure out if indexing first is a bad idea as the collection will point to an image that may not exist anymore (as it would be in s3 but not nessassrilly in the users path)
         try:
             uploadedImage = upload_file(argDict.face, argDict.profile, None, argDict.name)
         except FileNotFoundError:
@@ -369,14 +382,22 @@ def main(argv):
         for locktype in gestureConfig.keys():
             for position, details in gestureConfig[locktype].items():
                 # FIXME: It might not be important but the file suffix is not provided for the s3name
-                gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
+                try:
+                    gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
+                except FileNotFoundError:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"Could no longer find file {details['path']}",
+                        code=8
+                    )
                 gestureConfig[locktype][position]["path"] = gestureObjectPath
 
         try:
-            s3Client.putObject(
-                Body=gestureConfig,
+            gestureConfigStr = json.dumps(gestureConfig).encode("utf-8")
+            s3Client.put_object(
+                Body=gestureConfigStr,
                 Bucket=commons.FACE_RECOG_BUCKET,
-                Key=f"users/{argDict.profile}/GestureConfig.json"
+                Key=f"users/{argDict.profile}/gestures/GestureConfig.json"
             )
         except Exception as e:
             return commons.respond(
@@ -406,11 +427,14 @@ def main(argv):
 
         # Remove relevant face from rekog collection
         print(f"[INFO] Removing face from {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}")
-        deletedFace = index_photo.remove_face_from_collection(argDict.profile)
+        deletedFace = index_photo.remove_face_from_collection(f"{argDict.profile}.jpg")
+        if deletedFace is None:
+            # This can sometimes happen if deletion was attempted before but was not completed
+            print(f"[WARNING] No face found in {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}. We will assume it has already been removed.")
 
         # Check the user's folder actually exists in s3
         print(f"[INFO] Deleting user folder for {argDict.profile} from s3...")
-        s3FilePath = f"users/{argDict.profile}"
+        s3FilePath = f"users/{argDict.profile}/"
         try:
             s3Client.get_object_acl(
                 Bucket = commons.FACE_RECOG_BUCKET,
@@ -428,7 +452,7 @@ def main(argv):
 
         return commons.respond(
             messageType="SUCCESS",
-            message=f"User folder for {argDict.profile} was successfully removed from S3 and the respective face reference removed from the Rekognition Collection.",
+            message=f"User profile for {argDict.profile} was successfully removed from S3 and respective face reference removed from the Rekognition Collection.",
             content=deletedFace,
             code=0
         )

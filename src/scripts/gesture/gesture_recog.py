@@ -240,28 +240,29 @@ def projectHandler(start):
                 )
 
             # Verify model was actually stopped
-            versionDetails = getProjectVersions()[0]
-            if versionDetails["Status"] != "RUNNING":
+            stoppingVersion = getProjectVersions()[0]
+            if stoppingVersion["Status"] != "RUNNING":
                 # Stopping a model takes less time than starting one
                 stopTimeout = 120
                 print(f"[INFO] Request to stop {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
                 time.sleep(stopTimeout)
+                stoppedVersion = getProjectVersions()[0]
 
-                if (versionDetails["Status"] == "STOPPED"):
+                if stoppedVersion["Status"] == "STOPPED":
                     print(f"[SUCCESS] {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully stopped!")
                     return True
                 else:
                     return commons.respond(
                         messageType="ERROR",
                         message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to stop properly before {stopTimeout}s timeout expired",
-                        content={ "STATUS" : versionDetails["Status"] },
+                        content={ "STATUS" : stoppedVersion["Status"] },
                         code=15
                     )
             else:
                 return commons.respond(
                     messageType="ERROR",
                     message=f"{commons.GESTURE_RECOG_PROJECT_NAME} stop request was successfull but the latest model is still running.",
-                    content={ "MODEL" :  versionDetails['CreationTimestamp'], "STATUS" : versionDetails['Status'] },
+                    content={ "MODEL" :  stoppingVersion['CreationTimestamp'], "STATUS" : stoppingVersion['Status'] },
                     code=1
                 )
         elif versionDetails["Status"] == "STARTING":

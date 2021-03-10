@@ -54,13 +54,9 @@ def remove_face_from_collection(imageId):
         print(f"[WARNING] No face found with {imageId} image id. Trying to find a {altImageId} id to delete...")
         foundFace = faceInCollection(altImageId)
 
-        # Still no face was found. Item does not likely exist
+        # Still no face was found. Item does not likely exist so we return and leave error handling to caller
         if foundFace == {}:
-            return commons.respond(
-                messageType="ERROR",
-                message=f"No face found in collection with object name {imageId} or alternative object name {altImageId}",
-                code=2
-            )
+            return None
 
     # Delete Object
     deletedResponse = client.delete_faces(
@@ -159,7 +155,7 @@ def main(argv):
     )
     argumentParser.add_argument("-f", "--file",
         required=True,
-        help="Full path to a jpg or png image file (s3 or local)"
+        help="Full path to a jpg or png image file (s3 or local) to add to collection OR (if deleting) the file or username of the face to delete"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -169,12 +165,19 @@ def main(argv):
 
     if argDict.action == "delete":
         response = remove_face_from_collection(argDict.file)
-        return commons.respond(
-            messageType="SUCCESS",
-            message=f"{argDict.file} was successfully removed from the Rekognition Collection",
-            content=response,
-            code=0
-        )
+        if response is not None:
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{argDict.file} was successfully removed from the Rekognition Collection",
+                content=response,
+                code=0
+            )
+        else:
+            commons.respond(
+                messageType="ERROR",
+                message=f"No face found in collection with object name {argDict.file}",
+                code=2
+            )
     else:
         response = add_face_to_collection(argDict.file, argDict.name)
         return commons.respond(
