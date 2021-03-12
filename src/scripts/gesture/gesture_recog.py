@@ -7,6 +7,7 @@
 
 import boto3
 from botocore.exceptions import WaiterError
+from botocore.exceptions import ClientError
 rekogClient = boto3.client('rekognition')
 s3Client = boto3.client('s3')
 
@@ -62,11 +63,16 @@ def getGestureTypes():
     """getGestureTypes() : Gets a list of viable gesture types based off the rekognition project labels. Unfortunately, rekognition does not support pulling labels from a project directly so we will have to settle with pulling them from s3 instead
     :return: List of viable gestures
     """
-    #FIXME: Need to confirm that a list is produced from this (unlikely)
-    return list(s3Client.getObject(
-        Bucket=commons.FACE_RECOG_BUCKET,
-        Name="gestureTraining/"
-    )["Body"])
+    # This essentially retrieves the gestures, splits the path by delimiter and removes the excess empty strings
+    prefixPathSplits = list(map(lambda jsonObject: list(filter(None, jsonObject["Prefix"].split("/"))),
+        s3Client.list_objects_v2(
+            Bucket=commons.FACE_RECOG_BUCKET,
+            Prefix="gestureTraining/",
+            Delimiter="/"
+        )["CommonPrefixes"]
+    ))
+    # Finally, we return only the middle folder (the label name) and discard the root folder name
+    return list(map(lambda prefixPathSplit: prefixPathSplit[-1], prefixPathSplits))
 
 def checkForGestures(image):
     """checkForGestures() : Queries the latest AWS Custom Label model for the gesture metadata. I.e. Does this image contain a gesture and if so, which one is it most likely?
@@ -118,14 +124,25 @@ def checkForGestures(image):
                     content={ "ERROR" : str(e) },
                     code=7
                 )
+    except ClientError as e:
+        # On rare occassions, image is too big for AWS and will fail to process client side rather than server side
+        return commons.respond(
+            messageType="ERROR",
+            message=f"An error occured while processing {image} prior to uploading. Image may be too large for AWS to handle, try cropping or compressing the problamatic image.",
+            content={ "ERROR" : str(e) },
+            code=25
+        )
 
     # Extract gesture with highest confidence (or None if no gesture found)
-    foundGesture = max(detectedLabels, key = lambda ev: ev["Confidence"])
-    if foundGesture is not None:
-        print(f"[SUCCESS] Found a gesture!\n{foundGesture}")
-        return foundGesture
-    else:
-        # Return None if no gesture found, leaving handling to caller
+    try:
+        foundGesture = max(detectedLabels, key = lambda ev: ev["Confidence"])
+        if foundGesture is not None:
+            print(f"[SUCCESS] Found a gesture!\n{foundGesture}")
+            return foundGesture
+        else:
+            # Leave no gesture handling to caller (same applies to a value error which equates to the same thing)
+            return None
+    except ValueError:
         return None
 
 def getProjectVersions():
@@ -300,6 +317,11 @@ def main(argv):
         nargs="+",
         help="List of full paths (seperated by spaces) to a gesture combination (in order) that you would like to analyse."
     )
+    argumentParser.add_argument("-m", "--maintain",
+        action="store_true",
+        required=False,
+        help="If this parameter is set, the gesture recognition project will not be closed after rekognition is complete (only applicable with -a gesture"
+    )
     argDict = argumentParser.parse_args()
 
     if argDict.action == "gesture":
@@ -332,7 +354,7 @@ def main(argv):
                         )
                         continue
                     else:
-                        print(f"[WARNING] No gesture was found within {imagePath} (Available gestures = {getGestureTypes()}")
+                        print(f"[WARNING] No gesture was found within {imagePath} (Available gestures = {' '.join(getGestureTypes())})")
                         continue
                 else:
                     return commons.respond(
@@ -341,7 +363,8 @@ def main(argv):
                         code=8
                     )
         finally:
-            projectHandler(False)
+            if argDict.maintain is False:
+                projectHandler(False)
 
     elif argDict.action == "start":
         projectHandler(True)

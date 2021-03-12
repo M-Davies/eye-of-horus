@@ -189,7 +189,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
         try:
             print(f"[INFO] Identifying gesture type for {path}")
             try:
-                gestureType = gesture_recog.checkForGestures(path)['Name']
+                gestureType = gesture_recog.checkForGestures(path)
             except rekogClient.exceptions.ImageTooLargeException:
                 print(f"[WARNING] {path} is too large (>4MB) to check for gestures directly. Uploading to S3 first and then checking for gestures.")
                 try:
@@ -200,9 +200,11 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
                         message=f"Could no longer find file {path}",
                         code=8
                     )
-                gestureType = gesture_recog.checkForGestures(gestureObjectPath)['Name']
+                gestureType = gesture_recog.checkForGestures(gestureObjectPath)
 
             if gestureType is not None:
+                # Extract the actual gesture type here since error's will return None above
+                gestureType = gestureType['Name']
                 print(f"[SUCCESS] Gesture type identified as {gestureType}")
             else:
                 return commons.respond(
@@ -249,6 +251,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
             lambda position: previousFramework[position]["gesture"],
             previousFramework
         ))
+
         # Both combinations are the same
         if previousGestures == userGestures:
             return commons.respond(
@@ -258,7 +261,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
             )
 
         # One combination is the same as the other when reversed
-        if previousGestures.reverse() == userGestures or userGestures.reverse() == previousGestures:
+        if list(previousGestures.copy())[::-1] == userGestures or list(userGestures.copy())[::-1] == previousGestures:
             return commons.respond(
                 messageType="ERROR",
                 message=f"One gesture combination is the same as the other when reversed. Please ensure the combinations are different and not reversed versions of each other",
