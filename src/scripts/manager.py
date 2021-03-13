@@ -175,6 +175,63 @@ def timeoutHandler(signum, stackFrame):
     """
     raise TimeoutError
 
+def adjustConfigFramework(imagePaths, username, locktype, previousFramework):
+    """adjustConfigFramework() : Modifies a gesture configuration file according to the user's edit changes
+    :param imagePaths: New gesture paths to add
+    :param username: User's config file to update
+    :param locktype: Lock or unlock combination to update
+    :param previousFramework: If a lock gesture has been generated, use it to run the tests in the downstream construction
+    :return: Updated config dictionary
+    """
+    # Retrieve old configuration file
+    try:
+        oldFullConfig = s3Client.get_object(
+            Bucket=commons.FACE_RECOG_BUCKET,
+            Key=f"users/{username}/gestures/GestureConfig.json"
+        )["Body"].read()
+    except s3Client.exceptions.NoSuchKey:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"{username} is not an existing user or download of the user details failed",
+            code=2
+        )
+
+    # Adjust file to account for changes
+    newGestureLockTypeConfig = constructGestureFramework(imagePaths, username, locktype, previousFramework)
+    if locktype == "lock":
+        newGestureConfig = { "lock" : newGestureLockTypeConfig, "unlock" : oldFullConfig["unlock"] }
+    else:
+        newGestureConfig = { "lock" : oldFullConfig["lock"], "unlock" : newGestureLockTypeConfig }
+
+    # Upload new gestures, adjusting the path of the config file to be s3 relative
+    for position, details in newGestureConfig[locktype].items():
+        try:
+            gestureObjectPath = upload_file(details["path"], username, locktype, f"{locktype.capitalize()}Gesture{position}")
+        except FileNotFoundError:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"Could no longer find file {details['path']}",
+                code=8
+            )
+        newGestureConfig[locktype][position]["path"] = gestureObjectPath
+
+    # Upload gesture configuration file
+    try:
+        s3Client.put_object(
+            Body=json.dumps(newGestureConfig).encode("utf-8"),
+            Bucket=commons.FACE_RECOG_BUCKET,
+            Key=f"users/{username}/gestures/GestureConfig.json"
+        )
+    except Exception as e:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"Failed to upload updated gesture configuration file",
+            content={ "ERROR" : str(e) },
+            code=3
+        )
+
+    return newGestureConfig
+
 def constructGestureFramework(imagePaths, username, locktype, previousFramework=None):
     """constructGestureFramework() : Uploads gesture recognition images and config file to the user's S3 folder
     :param imagePaths: List of images paths or gesture types (in combination order)
@@ -238,10 +295,10 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
     ))
 
     # All gestures are the same in one combination
-    if len(set(userGestures)) == 1:
+    if len(set(gestureConfig)) == 1:
         return commons.respond(
             messageType="ERROR",
-            message=f"All gestures for {locktype}ing combination are the same. Please specify at least one different gesture in your combination",
+            message=f"All gestures for combination are the same. Please specify at least one different gesture in your combination",
             code=20
         )
 
@@ -284,8 +341,8 @@ def main(argv):
     )
     argumentParser.add_argument("-a", "--action",
         required=True,
-        choices=["create", "delete", "compare", "gesture"],
-        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout\n\ngesture: Starts streaming and executes the gesture comparison library against the user --profile.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
+        choices=["create", "edit", "delete", "compare", "gesture"],
+        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\edit: Edits a user --profile account's --face, --lock or --unlock feature. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout\n\ngesture: Starts streaming and executes the gesture comparison library against the user --profile.\n\nNote: There is no edit/rename action as S3 doesn't offer object renaming or deletion. If you wish to rename an object, delete the original and create a new one.
         """
     )
     argumentParser.add_argument("-f", "--face",
@@ -322,7 +379,7 @@ def main(argv):
     argumentParser.add_argument("-m", "--maintain",
         action="store_true",
         required=False,
-        help="If this parameter is set, the gesture recognition project will not be closed after rekognition is complete (only applicable with -a create,gesture"
+        help="If this parameter is set, the gesture recognition project will not be closed after rekognition is complete (only applicable with -a create,gesture,edit"
     )
     argDict = argumentParser.parse_args()
     print("[INFO] Parsed arguments:")
@@ -353,7 +410,7 @@ def main(argv):
             )
 
         # uploadedImage will the objectName so no need to check if there is a user in this function
-        indexedImage = index_photo.add_face_to_collection(argDict.face)
+        index_photo.add_face_to_collection(argDict.face)
 
         # First, start the rekog project so we can actually analyse the given images
         gesture_recog.projectHandler(True)
@@ -414,6 +471,79 @@ def main(argv):
         return commons.respond(
             messageType="SUCCESS",
             message=f"Facial recognition and gesture recognition images and configs files have been successfully uploaded!",
+            code=0
+        )
+
+    elif argDict.action == "edit":
+        # Verify we have a user to edit
+        if argDict.profile is None:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"-p was not given. Please provide a profile username for your account.",
+                code=13
+            )
+        else:
+            try:
+                s3Client.get_object_acl(
+                    Bucket = commons.FACE_RECOG_BUCKET,
+                    Key = f"users/{argDict.profile}"
+                )
+            except s3Client.exceptions.NoSuchKey:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"User {argDict.profile} does not exist or failed to download configuration file",
+                    code=9
+                )
+        if argDict.face is None and argDict.lock is None and argDict.unlock:
+            # Verify at least one editable feature was given
+            return commons.respond(
+                    messageType="ERROR",
+                    message=f"Neither -f, -u or -l was given. Please provide a profile feature to edit.",
+                    code=13
+            )
+
+        if argDict.face is not None:
+            # Delete old user image from collection
+            print(f"[INFO] Removing old face from {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}")
+            deletedFace = index_photo.remove_face_from_collection(f"{argDict.profile}.jpg")
+            if deletedFace is None:
+                # This can sometimes happen if deletion was attempted before but was not completed
+                print(f"[WARNING] No face found in {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}. We will assume it has already been removed.")
+            index_photo.add_face_to_collection(argDict.face)
+
+            # Replace user face in S3
+            try:
+                uploadedImage = upload_file(argDict.face, argDict.profile)
+            except FileNotFoundError:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"No such file {argDict.face}",
+                    code=8
+                )
+            print(f"[SUCCESS] {argDict.face} has successfully replaced user {argDict.profile} face!")
+
+        # Encase within two conditionals to avoid pointless running of gesture project
+        if argDict.lock is not None or argDict.unlock is not None:
+            try:
+                # Start gesture project to allow for gesture recognition
+                gesture_recog.projectHandler(True)
+
+                adjustedLock = {}
+                if argDict.lock is not None:
+                    adjustedLock = adjustConfigFramework(argDict.lock, argDict.profile, "lock")
+                    print(f"[SUCCESS] Lock gesture combination has been successfully replaced for user {argDict.profile}")
+
+                if argDict.unlock is not None:
+                    adjustedUnlock = adjustConfigFramework(argDict.unlock, argDict.profile, "unlock", adjustedLock)
+                    print(f"[SUCCESS] Unlock gesture combination has been successfully replaced for user {argDict.profile}")
+
+            finally:
+                if argDict.maintain is False:
+                    gesture_recog.projectHandler(False)
+
+        return commons.respond(
+            messageType="SUCCESS",
+            message="All done!",
             code=0
         )
 
