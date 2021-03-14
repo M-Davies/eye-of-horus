@@ -160,7 +160,6 @@ def checkForFaces():
     )["Shards"]
 
     # Iterate through the shards
-    # NOTE: Might not be needed as currently the stream only serves a max of one shard
     for shard in shards:
         matchedFace = examineShard(shard)
 
