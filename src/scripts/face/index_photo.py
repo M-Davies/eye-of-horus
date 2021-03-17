@@ -33,6 +33,7 @@ def faceInCollection(faceId):
             print(f"[INFO] {faceId} found with object name {faceId} (id = {face['FaceId']}). Face to be deleted:\n{face}")
             foundFace = dict(face)
             break
+
     return foundFace
 
 def remove_face_from_collection(imageId):
@@ -53,13 +54,9 @@ def remove_face_from_collection(imageId):
         print(f"[WARNING] No face found with {imageId} image id. Trying to find a {altImageId} id to delete...")
         foundFace = faceInCollection(altImageId)
 
-        # Still no face was found. Item does not likely exist
+        # Still no face was found. Item does not likely exist so we return and leave error handling to caller
         if foundFace == {}:
-            return commons.respond(
-                messageType="ERROR",
-                message=f"No face found in collection with object name {imageId} or alternative object name {altImageId}",
-                code=2
-            )
+            return None
 
     # Delete Object
     deletedResponse = client.delete_faces(
@@ -116,20 +113,27 @@ def add_face_to_collection(imagePath, s3Name=None):
     else:
         # Use an S3 object if no file was found at the image path given
         print(f"[WARNING] {imagePath} does not exist as a local file. Attempting to retrieve the image using the same path from S3 with object name {objectName}")
-        response = client.index_faces(
-            CollectionId = commons.FACE_RECOG_COLLECTION,
-            Image = { 'S3Object' : {
-                'Bucket' : commons.FACE_RECOG_BUCKET,
-                'Name' : imagePath
-            } },
-            ExternalImageId = objectName,
-            MaxFaces = 1,
-            QualityFilter = "AUTO",
-            DetectionAttributes = ['ALL']
-        )
+        try:
+            response = client.index_faces(
+                CollectionId = commons.FACE_RECOG_COLLECTION,
+                Image = { 'S3Object' : {
+                    'Bucket' : commons.FACE_RECOG_BUCKET,
+                    'Name' : imagePath
+                } },
+                ExternalImageId = objectName,
+                MaxFaces = 1,
+                QualityFilter = "AUTO",
+                DetectionAttributes = ['ALL']
+            )
+        except client.exceptions.InvalidS3ObjectException:
+            return commons.respond(
+                messageType="ERROR",
+                message=f"No such file found locally or in S3: {imagePath}",
+                code=9
+            )
 
     # We're only looking to return one face
-    print(f"[SUCCESS] {imagePath} was successfully add to the collection with image id {objectName}")
+    print(f"[SUCCESS] {imagePath} was successfully added to the collection with image id {objectName}")
     return json.dumps(response['FaceRecords'][0])
 
 #########
@@ -151,7 +155,7 @@ def main(argv):
     )
     argumentParser.add_argument("-f", "--file",
         required=True,
-        help="Full path to a jpg or png image file (s3 or local)"
+        help="Full path to a jpg or png image file (s3 or local) to add to collection OR (if deleting) the file or username of the face to delete"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -161,12 +165,19 @@ def main(argv):
 
     if argDict.action == "delete":
         response = remove_face_from_collection(argDict.file)
-        return commons.respond(
-            messageType="SUCCESS",
-            message=f"{argDict.file} was successfully removed from the Rekognition Collection",
-            content=response,
-            code=0
-        )
+        if response is not None:
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"{argDict.file} was successfully removed from the Rekognition Collection",
+                content=response,
+                code=0
+            )
+        else:
+            commons.respond(
+                messageType="ERROR",
+                message=f"No face found in collection with object name {argDict.file}",
+                code=2
+            )
     else:
         response = add_face_to_collection(argDict.file, argDict.name)
         return commons.respond(

@@ -30,10 +30,10 @@ def examineFace(record):
     :param record: Shard containing frames and fragment numbers
     :return: The matched face object with the highest similarity to the detected face
     """
-    # NOTE: This will only check one face in the stream. This is intentional as the system gets overly complex and insecure when more than one face is trying to authenticate.
     jsonData = json.loads(record["Data"])
     matchedFaces = None
     try:
+        # NOTE: This will only check one face in the stream. This is intentional as the system gets overly complex and insecure when more than one face is trying to authenticate.
         matchedFaces = jsonData["FaceSearchResponse"][0]["MatchedFaces"]
     except IndexError:
         return matchedFaces
@@ -84,7 +84,7 @@ def examineShard(shardJson):
 
             # If records array empty, try adjacent shard and iterate until timeout expires or face is found
             if records["Records"] == []:
-                print(f"[WARNING] No records were found in shard {shardJson['ShardId']}. Trying the next shard with iterator {records['NextShardIterator']}")
+                print(f"[WARNING] No records were found in shard {shardJson['ShardId']}. Trying next shard with same iterator...")
                 iterator = records['NextShardIterator']
                 continue
             else:
@@ -160,7 +160,6 @@ def checkForFaces():
     )["Shards"]
 
     # Iterate through the shards
-    # NOTE: might not be needed as currently the stream only serves a max of one shard
     for shard in shards:
         matchedFace = examineShard(shard)
 

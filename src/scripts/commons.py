@@ -5,7 +5,6 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
-from dotenv import load_dotenv
 import sys
 import os
 import json
@@ -16,11 +15,12 @@ FACE_RECOG_COLLECTION = "RekognitionCollection"
 FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
 CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
+GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
 
-THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION", "SUCCESS"]
+THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION"]
 
 def respond(messageType, code, message, content=None):
-    """respond() : Print/return informational JSON message and terminate execution
+    """respond() : Print/return informational JSON message and sometimes terminate execution
     :param messageType: Type of message (ERROR, SUCCESS, etc)
     :param code: Exit code to terminate execution with
     :param message: Short message to be sent describing the event

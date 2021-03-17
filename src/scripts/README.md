@@ -18,3 +18,15 @@ These scripts can be used with the accompanying website OR on their own via the 
 11. Stream Wasn't Found
 12. Stream Was Interrupted
 13. Invalid Action Type
+14. Custom Label Project Failed To Start
+15. Custom Label Project Failed To Start Within The Timeout
+16. Custom Label Project Failed To Die (How incredibly rude that it's not allowed to live)
+17. No recognised gesture was detected
+18. Gesture was detected but it was not in the user's combination and/or in in the right position of the user's combination
+19. Stream Timeout Failed To Fire
+20. Rule Violation: All gestures of the specific locktype are the same
+21. Rule Violation: The locking gesture is the same as the unlocking gesture
+22. Rule Violation: One gesture combination is the same as the other when reversed
+23. Custom Label Project is shutting down or starting up
+24. Given image is too large for detect custom labels
+25. ClientError on image processing of custom labels. Likeihood is too large to even send with detect_custom_labels
