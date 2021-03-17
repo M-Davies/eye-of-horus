@@ -17,6 +17,7 @@ import time
 import subprocess
 import signal
 import json
+from datetime import datetime
 from PIL import Image
 
 from face import index_photo
@@ -309,7 +310,7 @@ def main(argv):
         help="S3 name of the face image to be uploaded. This is what the image will be stored as in S3. If not specified, the filename passed to --file is used instead."
     )
     timeoutSecondsFace = 20
-    timeoutSecondsGesture = 40
+    timeoutSecondsGesture = 60
     argumentParser.add_argument("-t", "--timeout",
         required=False,
         type=int,
@@ -402,7 +403,7 @@ def main(argv):
                 gestureConfig[locktype][position]["path"] = gestureObjectPath
 
         try:
-            gestureConfigStr = json.dumps(gestureConfig).encode("utf-8")
+            gestureConfigStr = json.dumps(gestureConfig, indent=2).encode("utf-8")
             s3Client.put_object(
                 Body=gestureConfigStr,
                 Bucket=commons.FACE_RECOG_BUCKET,
@@ -538,11 +539,12 @@ def main(argv):
         # Start rekognition model so it is ready for when we start streaming
         gesture_recog.projectHandler(True)
 
-        # Get the length of the user's combination to identify when we have filled the combination
-        userComboLength = int(max(gesture_recog.getUserCombinationFile(argDict.profile)[locktype]))
+        # Get user's combination to identify when we have filled the combination and to save api spamming later
+        userConfig = gesture_recog.getUserCombinationFile(argDict.profile)
+        userComboLength = int(max(userConfig[locktype]))
         try:
             # Start/end stream
-            streamHandler(True, 8)
+            streamHandler(True, 10)
 
             # Retrieve stream's session url endpoint
             endpoint = boto3.client('kinesisvideo').get_data_endpoint(
@@ -558,10 +560,11 @@ def main(argv):
                     StreamName = commons.CAMERA_STREAM_NAME,
                     PlaybackMode = "LIVE"
                 )["HLSStreamingSessionURL"]
-            except:
+            except (Exception, kvmClient.exceptions.ResourceNotFoundException) as e:
                 return commons.respond(
                     messageType="ERROR",
                     message=f"Stream URL was not valid or stream wasn't found. Try restarting the stream and trying again",
+                    content={ "ERROR" : str(e) },
                     code=11
                 )
 
@@ -575,25 +578,40 @@ def main(argv):
 
             # Better user feedback to start at 1 rather than 0
             matchedGestures = 1
-            while(matchedGestures < userComboLength):
+            frameCounter = 0
+            while(matchedGestures <= userComboLength):
 
                 # Capture frame-by-frame
                 ret, frame = vcap.read()
+                cv2.imshow('frame',frame)
 
-                if ret is not False or frame is not None:
-                    # Run gesture recog lib against captured frame
-                    foundGesture = gesture_recog.checkForGestures(frame)
-                    if foundGesture is not None:
-                        # FIXME: Remove this
-                        print(f"[INFO] Checking if {argDict.profile} contains the correct gesture for the {locktype} combination at position {matchedGestures}...")
-                        hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, matchedGestures)
+                if ret is not False and frame is not None:
 
-                        # User has gesture and it's at the right position
-                        if hasGesture is True:
+                    # Only look at certain frames to avoid race condition
+                    if frameCounter % 15 == 0:
+                        # Run gesture recog lib against captured frame
+                        foundGesture = gesture_recog.checkForGestures(cv2.imencode(".jpg", frame)[1].tostring())
+                        # Timestamp for debug reference
+                        now = (datetime.now()).strftime("%H:%M:%S")
+
+                        if foundGesture is not None:
                             # FIXME: Remove this
-                            print(f"[SUCCESS] Correct gesture given for position {matchedGestures}! Checking next gesture...")
-                            matchedGestures += 1
-                            continue
+                            print(f"{now} Checking if the {locktype} combination contains the same gesture as frame {frameCounter} at position {matchedGestures}...")
+                            hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, str(matchedGestures), userConfig)
+
+                            # User has gesture and it's at the right position
+                            if hasGesture is True:
+                                # FIXME: Remove this
+                                print(f"[SUCCESS] Correct gesture given for position {matchedGestures}!")
+                                matchedGestures += 1
+                                continue
+                            else:
+                                # FIXME: Remove this
+                                print(f"{now} Gesture was found but is not correct")
+                        else:
+                            # FIXME: Remove this
+                            print(f"{now} No gesture was found")
+                    frameCounter += 1
                 else:
                     return commons.respond(
                         messageType="ERROR",
@@ -604,7 +622,8 @@ def main(argv):
 
             # By this point, we have found a set of matching gestures so cancel timeout and return access granted
             signal.alarm(0)
-            if matchedGestures == userComboLength:
+            # -1 as we started at 1 rather than 0
+            if matchedGestures-1 == userComboLength:
                 return commons.respond(
                     messageType="SUCCESS",
                     message=f"Matched {locktype} gesture combination for user {argDict.profile}",
@@ -634,8 +653,12 @@ def main(argv):
                 gesture_recog.projectHandler(False)
 
             # When everything done, release the capture
-            vcap.release()
-            cv2.destroyAllWindows()
+            try:
+                vcap.release()
+                cv2.destroyAllWindows()
+            except UnboundLocalError:
+                # Sometimes, we fail before opencv starts up. In which case, there's no need to cease capture
+                pass
 
     else:
         return commons.respond(
