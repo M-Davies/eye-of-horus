@@ -84,7 +84,7 @@ def examineShard(shardJson):
 
             # If records array empty, try adjacent shard and iterate until timeout expires or face is found
             if records["Records"] == []:
-                print(f"[WARNING] No records were found in shard {shardJson['ShardId']}. Trying the next shard with iterator {records['NextShardIterator']}")
+                print(f"[WARNING] No records were found in shard {shardJson['ShardId']}. Trying next shard with same iterator...")
                 iterator = records['NextShardIterator']
                 continue
             else:
@@ -160,7 +160,6 @@ def checkForFaces():
     )["Shards"]
 
     # Iterate through the shards
-    # NOTE: Might not be needed as currently the stream only serves a max of one shard
     for shard in shards:
         matchedFace = examineShard(shard)
 
