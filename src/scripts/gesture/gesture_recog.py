@@ -277,7 +277,7 @@ def projectHandler(start):
             stoppingVersion = getProjectVersions()[0]
             if stoppingVersion["Status"] != "RUNNING":
                 # Stopping a model takes less time than starting one
-                stopTimeout = 120
+                stopTimeout = 150
                 print(f"[INFO] Request to stop {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
                 time.sleep(stopTimeout)
                 stoppedVersion = getProjectVersions()[0]
