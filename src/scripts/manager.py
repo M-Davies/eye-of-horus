@@ -8,6 +8,7 @@
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
 from boto3.s3.transfer import TransferConfig
+from ratelimit import RateLimitException
 
 import cv2
 import sys
@@ -727,7 +728,14 @@ def main(argv):
                         if foundGesture is not None:
                             # FIXME: Remove this
                             print(f"{now} Checking if the {locktype} combination contains the same gesture as frame {frameCounter} at position {matchedGestures}...")
-                            hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, str(matchedGestures), userConfig)
+                            try:
+                                hasGesture = gesture_recog.inUserCombination(foundGesture, argDict.profile, locktype, str(matchedGestures), userConfig)
+                            except RateLimitException:
+                                return commons.respond(
+                                    messageType="ERROR",
+                                    message="Too many user requests in the space of 5 minutes. Please retry later",
+                                    code=26
+                                )
 
                             # User has gesture and it's at the right position
                             if hasGesture is True:

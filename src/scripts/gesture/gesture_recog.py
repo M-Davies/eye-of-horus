@@ -7,6 +7,8 @@
 
 import boto3
 from botocore.exceptions import WaiterError, ClientError, HTTPClientError
+from ratelimit import limits
+
 rekogClient = boto3.client('rekognition')
 s3Client = boto3.client('s3')
 
@@ -49,8 +51,9 @@ def getUserCombinationFile(username):
             code=2
         )
 
+@limits(calls=15, period=300)
 def inUserCombination(gestureJson, username, locktype, position, userCombination=None):
-    """inUserCombination() : Calculates if the given gesture is in the user's combination and in the correct position.
+    """inUserCombination() : Calculates if the given gesture is in the user's combination and in the correct position. This is ratelimited to try and avoid bruteforcing.
     :param gestureJson: Identified gesture JSON object returned from AWS detect_custom_labels
     :param username: User to pull gesture combination
     :param locktype: Whether we are locking or unlocking
@@ -74,7 +77,7 @@ def getGestureTypes():
     """getGestureTypes() : Gets a list of viable gesture types based off the rekognition project labels. Unfortunately, rekognition does not support pulling labels from a project directly so we will have to settle with pulling them from s3 instead
     :return: List of viable gestures
     """
-    # This essentially retrieves the gestures, splits the path by delimiter and removes the excess empty strings
+    # This essentially retrieves all possible gestures, splits path by delimiter and removes the excess empty strings
     prefixPathSplits = list(map(lambda jsonObject: list(filter(None, jsonObject["Prefix"].split("/"))),
         s3Client.list_objects_v2(
             Bucket=commons.FACE_RECOG_BUCKET,
