@@ -6,7 +6,7 @@
 .pnp.js
 .env
 
-# testing and images
+# resources
 **/__pycache__/**
 images/*
 testing/personalNotes.md
@@ -17,6 +17,7 @@ testing/personalNotes.md
 # production
 /build
 **/node_modules/**
+**/response.json
 
 # misc
 .DS_Store

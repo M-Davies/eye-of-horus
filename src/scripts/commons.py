@@ -37,10 +37,10 @@ def respond(messageType, code, message, content=None):
     )
     print(jsonMessage)
 
-    # For successes, we return as we assume the exit code is non-important for the website
-    if messageType == "SUCCESS":
-        return jsonMessage
-    elif messageType in THROWABLE_OUTCOMES:
+    if messageType in THROWABLE_OUTCOMES:
+        # Replace response file and exit
+        with open("response.json", "w") as logfile:
+            logfile.write(jsonMessage)
         sys.exit(code)
 
 def parseObjectName(fileName):

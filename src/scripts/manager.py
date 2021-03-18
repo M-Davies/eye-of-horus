@@ -1,5 +1,5 @@
 # -----------------------------------------------------------
-# Uploads an image containing a face to S3
+# Main management file that is the main input source for users and website
 #
 # Copyright (c) 2021 Morgan Davies, UK
 # Released under GNU GPL v3 License

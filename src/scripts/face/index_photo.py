@@ -1,5 +1,5 @@
 # -----------------------------------------------------------
-# Retrieves a photo from S3 or locally and adds it to a Rekognition Collection
+# Retrieves a photo from S3 or locally and adds/removes it from the Rekognition Collection
 #
 # Copyright (c) 2021 Morgan Davies, UK
 # Released under GNU GPL v3 License
