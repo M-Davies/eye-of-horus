@@ -493,15 +493,15 @@ def main(argv):
             try:
                 s3Client.get_object_acl(
                     Bucket = commons.FACE_RECOG_BUCKET,
-                    Key = f"users/{argDict.profile}"
+                    Key = f"users/{argDict.profile}/{argDict.profile}.jpg"
                 )
             except s3Client.exceptions.NoSuchKey:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"User {argDict.profile} does not exist or failed to download configuration file",
+                    message=f"User {argDict.profile} does not exist or failed to retrieve configuration file",
                     code=9
                 )
-        if argDict.face is None and argDict.lock is None and argDict.unlock:
+        if argDict.face is None and argDict.lock is None and argDict.unlock is None:
             # Verify at least one editable feature was given
             return commons.respond(
                     messageType="ERROR",
@@ -520,7 +520,7 @@ def main(argv):
 
             # Replace user face in S3
             try:
-                uploadedImage = upload_file(argDict.face, argDict.profile)
+                uploadedImage = upload_file(argDict.face, argDict.profile, None, f"{argDict.profile}.jpg")
             except FileNotFoundError:
                 return commons.respond(
                     messageType="ERROR",
