@@ -176,7 +176,7 @@ def timeoutHandler(signum, stackFrame):
     """
     raise TimeoutError
 
-def adjustConfigFramework(imagePaths, username, locktype, previousFramework):
+def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None):
     """adjustConfigFramework() : Modifies a gesture configuration file according to the user's edit changes
     :param imagePaths: New gesture paths to add
     :param username: User's config file to update
@@ -186,10 +186,10 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework):
     """
     # Retrieve old configuration file
     try:
-        oldFullConfig = s3Client.get_object(
+        oldFullConfig = json.loads(s3Client.get_object(
             Bucket=commons.FACE_RECOG_BUCKET,
             Key=f"users/{username}/gestures/GestureConfig.json"
-        )["Body"].read()
+        )["Body"].read())
     except s3Client.exceptions.NoSuchKey:
         return commons.respond(
             messageType="ERROR",
@@ -219,7 +219,7 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework):
     # Upload gesture configuration file
     try:
         s3Client.put_object(
-            Body=json.dumps(newGestureConfig).encode("utf-8"),
+            Body=json.dumps(newGestureConfig, indent=2).encode("utf-8"),
             Bucket=commons.FACE_RECOG_BUCKET,
             Key=f"users/{username}/gestures/GestureConfig.json"
         )
@@ -354,13 +354,13 @@ def main(argv):
         required=False,
         action="extend",
         nargs="+",
-        help="Two options for this command:\n1) FOR -a create = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination when streaming\n2) FOR -a gesture = Simply specify this param with -l YES to declare that the user --profile wishes to attempt to lock their system using their lock gesture pattern"
+        help="Two options for this command:\n1) FOR -a create OR -a edit = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination when streaming\n2) FOR -a gesture = Simply specify this param with -l YES to declare that the user --profile wishes to attempt to lock their system using their lock gesture pattern"
     )
     argumentParser.add_argument("-u", "--unlock",
         required=False,
         action="extend",
         nargs="+",
-        help="Two options for this command:\n1)FOR -a create = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination when streaming\n2) FOR -a gesture = Simply specify this param with -u YES to declare that the user --profile wishes to attempt to unlock their system using their unlock gesture pattern"
+        help="Two options for this command:\n1)FOR -a create OR -a edit = ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination when streaming\n2) FOR -a gesture = Simply specify this param with -u YES to declare that the user --profile wishes to attempt to unlock their system using their unlock gesture pattern"
     )
     argumentParser.add_argument("-n", "--name",
         required=False,
@@ -535,13 +535,13 @@ def main(argv):
                 # Start gesture project to allow for gesture recognition
                 gesture_recog.projectHandler(True)
 
-                adjustedLock = {}
+                adjustedLock = None
                 if argDict.lock is not None:
                     adjustedLock = adjustConfigFramework(argDict.lock, argDict.profile, "lock")
                     print(f"[SUCCESS] Lock gesture combination has been successfully replaced for user {argDict.profile}")
 
                 if argDict.unlock is not None:
-                    adjustedUnlock = adjustConfigFramework(argDict.unlock, argDict.profile, "unlock", adjustedLock)
+                    adjustedUnlock = adjustConfigFramework(argDict.unlock, argDict.profile, "unlock", adjustedLock["lock"])
                     print(f"[SUCCESS] Unlock gesture combination has been successfully replaced for user {argDict.profile}")
 
             finally:

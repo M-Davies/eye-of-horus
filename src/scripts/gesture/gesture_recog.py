@@ -218,7 +218,7 @@ def projectHandler(start):
                 )
 
             delay = 25
-            maxAttempts = 37
+            maxAttempts = 38
             timeoutSeconds = delay * maxAttempts
 
             print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
@@ -234,7 +234,7 @@ def projectHandler(start):
             except WaiterError:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly before {timeoutSeconds}s timeout expired",
+                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly before {timeoutSeconds}s timeout expired. Model is likely still booting up",
                     code=15
                 )
 
