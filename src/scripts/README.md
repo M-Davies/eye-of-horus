@@ -30,3 +30,4 @@ These scripts can be used with the accompanying website OR on their own via the 
 23. Custom Label Project is shutting down or starting up
 24. Given image is too large for detect custom labels
 25. ClientError on image processing of custom labels. Likeihood is too large to even send with detect_custom_labels
+26. User gesture combination api is ratelimited
