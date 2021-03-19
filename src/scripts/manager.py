@@ -733,7 +733,7 @@ def main(argv):
                             except RateLimitException:
                                 return commons.respond(
                                     messageType="ERROR",
-                                    message="Too many user requests in the space of 5 minutes. Please retry later",
+                                    message="Too many user requests in too short a time. Please try again later",
                                     code=26
                                 )
 

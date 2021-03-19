@@ -51,7 +51,7 @@ def getUserCombinationFile(username):
             code=2
         )
 
-@limits(calls=15, period=300)
+@limits(calls=100, period=300)
 def inUserCombination(gestureJson, username, locktype, position, userCombination=None):
     """inUserCombination() : Calculates if the given gesture is in the user's combination and in the correct position. This is ratelimited to try and avoid bruteforcing.
     :param gestureJson: Identified gesture JSON object returned from AWS detect_custom_labels
