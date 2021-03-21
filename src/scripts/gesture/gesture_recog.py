@@ -51,21 +51,17 @@ def getUserCombinationFile(username):
             code=2
         )
 
-@limits(calls=100, period=300)
-def inUserCombination(gestureJson, username, locktype, position, userCombination=None):
+@limits(calls=30, period=120)
+def inUserCombination(gestureJson, username, locktype, position):
     """inUserCombination() : Calculates if the given gesture is in the user's combination and in the correct position. This is ratelimited to try and avoid bruteforcing.
     :param gestureJson: Identified gesture JSON object returned from AWS detect_custom_labels
     :param username: User to pull gesture combination
     :param locktype: Whether we are locking or unlocking
     :param position: Position in the combination we are checking for the gestureJson
-    :param userCombination: Optional user combination dictionary to compare against
     :return: Boolean denoting if the given gesture and position are both valid in the user's gesture combination
     """
     # Retrieve user's gesture config file
-    if userCombination is None:
-        gestureConfig = getUserCombinationFile(username)
-    else:
-        gestureConfig = userCombination
+    gestureConfig = getUserCombinationFile(username)
 
     # Is the stored gesture type and position a match for the detected gesture type and position?
     if gestureConfig[locktype][position]["gesture"] == gestureJson["Name"]:
@@ -96,69 +92,53 @@ def checkForGestures(image):
     confidence = 85
     arn = os.getenv("LATEST_MODEL_ARN")
 
-    # The param given are file bytes from an streamed image
-    try:
-        detectedLabels = rekogClient.detect_custom_labels(
-            Image={
-                'Bytes': image,
-            },
-            MinConfidence=confidence,
-            ProjectVersionArn=arn
-        )['CustomLabels']
-    except HTTPClientError:
-        # Special case as when the signal handler cancels the script during a detect labels, it will raise this exception
-        raise TimeoutError
-    except rekogClient.exceptions.InvalidImageFormatException:
-        # The param given is hopefully a local image file
-        print(f"[INFO] Analysing image to see if it contains a recognised gesture...")
-        if os.path.isfile(image):
-            with open(image, "rb") as fileBytes:
-                # This may throw a ImageTooLargeException as the max allowed by AWS in byte format is 4mb (we let the caller deal with that)
-                try:
-                    detectedLabels = rekogClient.detect_custom_labels(
-                        Image={
-                            'Bytes': fileBytes.read(),
-                        },
-                        MinConfidence=confidence,
-                        ProjectVersionArn=arn
-                    )['CustomLabels']
-                except ClientError as e:
-                    # On rare occassions, image is too big for AWS and will fail to process client side rather than server side
-                    return commons.respond(
-                        messageType="ERROR",
-                        message=f"An error occured while processing {image} prior to uploading. Image may be too large for AWS to handle, try cropping or compressing the problamatic image.",
-                        content={ "ERROR" : str(e) },
-                        code=25
-                    )
-        else:
-            # The param given is a file path to an image in s3
-            print("[WARNING] Given parameter is not image bytes or a local image, likelihood is we are dealing with an s3 object path...")
+    # The param given is a local image file
+    if os.path.isfile(image):
+        with open(image, "rb") as fileBytes:
+            # This may throw a ImageTooLargeException as the max allowed by AWS in byte format is 4mb (we let the caller deal with that)
             try:
                 detectedLabels = rekogClient.detect_custom_labels(
                     Image={
-                        'S3Object': {
-                            'Bucket' : commons.FACE_RECOG_BUCKET,
-                            'Name' : image,
-                        }
+                        'Bytes': fileBytes.read(),
                     },
                     MinConfidence=confidence,
                     ProjectVersionArn=arn
                 )['CustomLabels']
-            except Exception as e:
-                # The param given is none of the above
+            except ClientError as e:
+                # On rare occassions, image is too big for AWS and will fail to process client side rather than server side
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{image} is an invalid object to analyse for custom labels or another exception occurred",
+                    message=f"An error occured while processing {image} prior to uploading. Image may be too large for AWS to handle, try cropping or compressing the problamatic image.",
                     content={ "ERROR" : str(e) },
-                    code=7
+                    code=25
                 )
+    else:
+        # The param given is a file path to an image in s3
+        print("[WARNING] Given parameter is not image bytes or a local image, likelihood is we are dealing with an s3 object path...")
+        try:
+            detectedLabels = rekogClient.detect_custom_labels(
+                Image={
+                    'S3Object': {
+                        'Bucket' : commons.FACE_RECOG_BUCKET,
+                        'Name' : image,
+                    }
+                },
+                MinConfidence=confidence,
+                ProjectVersionArn=arn
+            )['CustomLabels']
+        except Exception as e:
+            # The param given is none of the above
+            return commons.respond(
+                messageType="ERROR",
+                message=f"{image} is an invalid object to analyse for custom labels or another exception occurred",
+                content={ "ERROR" : str(e) },
+                code=7
+            )
 
     # Extract gesture with highest confidence (or None if no gesture found)
     try:
         foundGesture = max(detectedLabels, key = lambda ev: ev["Confidence"])
         if foundGesture is not None:
-            # FIXME: Remove this
-            print(f"[INFO] Found a gesture!\n{foundGesture}")
             return foundGesture
         else:
             # Leave no gesture handling to caller (same applies to a value error which equates to the same thing)
@@ -221,7 +201,7 @@ def projectHandler(start):
                 )
 
             delay = 25
-            maxAttempts = 38
+            maxAttempts = 40
             timeoutSeconds = delay * maxAttempts
 
             print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
