@@ -12,15 +12,4 @@ class Stream extends Component {
             .then(res => res.text())
                 .then(res => this.setState({ apiResponse: res }));
     }
-
-    return (
-        <Button
-            id="stream_button"
-            variant="success"
-            size="lg"
-            onClick={startStream}
-        >
-            Start Stream!
-        </Button>
-    )
 }
