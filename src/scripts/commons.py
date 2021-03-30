@@ -5,6 +5,7 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
+import os
 import sys
 import json
 
@@ -15,6 +16,7 @@ FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
 CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
 GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
+RESPONSE_FILE_PATH = f"{os.path.dirname(os.path.realpath(__file__))}/response.json"
 
 
 def respond(messageType, code, message, content=None):
@@ -36,7 +38,7 @@ def respond(messageType, code, message, content=None):
     print(jsonMessage)
 
     # Replace response file and exit
-    with open("response.json", "w") as logfile:
+    with open(RESPONSE_FILE_PATH, "w") as logfile:
         logfile.write(jsonMessage)
     sys.exit(code)
 

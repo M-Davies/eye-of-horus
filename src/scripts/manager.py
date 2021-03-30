@@ -253,7 +253,18 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
     position = 1
     gestureConfig = {}
     for path in imagePaths:
-        try:
+        if os.path.isfile(path):
+            # Verify local file is an actual image
+            try:
+                Image.open(path)
+            except IOError:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"File {path} exists but is not an image. Only jpg and png files are valid",
+                    code=7
+                )
+
+            # Identify the gesture type
             print(f"[INFO] Identifying gesture type for {path}")
             try:
                 gestureType = gesture_recog.checkForGestures(path)
@@ -279,7 +290,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
                     message="No recognised gesture was found within the image",
                     code=17
                 )
-        except FileNotFoundError:
+        else:
             gestureType = path
             print(f"[WARNING] No image to upload ({gestureType} is the assumed name of the gesture type). Verifying this is a supported gesture type...")
             # We don't need to do this for a file as it is scanned for valid gestures during analysis
@@ -287,7 +298,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
             if gestureType not in gestureTypes:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{gestureType} is not a valid gesture type. Valid gesture types = {gestureTypes.join(' ')}",
+                    message=f"{gestureType} is not a valid gesture type. Valid gesture types = {gestureTypes}",
                     code=17
                 )
             else:
@@ -408,6 +419,13 @@ def parseArgs(args):
 #########
 def main(parsedArgs=None):
     """main() : Main method that parses the input opts and returns the result"""
+    # Delete old response file if it exists
+    if os.path.isfile(commons.RESPONSE_FILE_PATH):
+        try:
+            os.remove(commons.RESPONSE_FILE_PATH)
+        except Exception as e:
+            print(f"[WARNING] Failed to delete old response json file\n{e}")
+
     # Parse input parameters
     if parsedArgs is None:
         # Parse with sys args if running by command line
@@ -442,7 +460,7 @@ def main(parsedArgs=None):
                     code=8
                 )
         # Verify we have a lock and unlock gesture combination
-        if argDict.lock is None and argDict.unlock is None:
+        if argDict.lock is None or argDict.unlock is None:
             return commons.respond(
                 messageType="ERROR",
                 message="-l or -u was not given. Please provide locking (-l) and unlocking (-u) gesture combinations so your user account can be created.",

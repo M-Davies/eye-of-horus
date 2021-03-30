@@ -22,7 +22,7 @@
     "pyinstall": "pip install -r src/scripts/requirements.txt",
     "test": "ROOT_DIR=. pytest -q --log-cli-level=INFO && react-scripts test",
     "jstest": "ROOT_DIR=. react-scripts test",
-    "pytest": "ROOT_DIR=. pytest -q --log-cli-level=INFO",
+    "pytest": "ROOT_DIR=$PWD pytest -q --log-cli-level=INFO",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

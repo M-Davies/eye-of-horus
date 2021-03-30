@@ -5,7 +5,6 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
-import commons
 import sys
 import os
 import argparse
@@ -19,6 +18,9 @@ from dotenv import load_dotenv
 import boto3
 from botocore.exceptions import WaiterError, ClientError
 from ratelimit import limits
+
+sys.path.append(os.path.dirname(__file__) + "/..")
+import commons  # noqa: E402
 
 rekogClient = boto3.client('rekognition')
 s3Client = boto3.client('s3')
@@ -302,11 +304,11 @@ def projectHandler(start):
         elif versionDetails["Status"] == "STOPPING":
             return commons.respond(
                 messageType="ERROR",
-                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is stopping. Please check again later when the process is complete...",
+                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is already stopping",
                 code=23
             )
         else:
-            print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} model is already stopped!")
+            print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} model has already stopped!")
             return True
 
 
