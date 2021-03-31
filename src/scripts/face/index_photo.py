@@ -5,6 +5,8 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
+import commons
+
 import boto3
 
 import os
@@ -14,9 +16,9 @@ from PIL import Image
 
 import sys
 sys.path.append(os.path.dirname(__file__) + "/..")
-import commons
 
 client = boto3.client('rekognition')
+
 
 def faceInCollection(faceId):
     """faceInCollection() : Searches and returns a user face's details (by it's external image id) in the rekognition collection
@@ -24,7 +26,7 @@ def faceInCollection(faceId):
     :returns: Matched rekognition collection object
     """
     faces = client.list_faces(
-        CollectionId = commons.FACE_RECOG_COLLECTION,
+        CollectionId=commons.FACE_RECOG_COLLECTION,
     )['Faces']
 
     foundFace = {}
@@ -35,6 +37,7 @@ def faceInCollection(faceId):
             break
 
     return foundFace
+
 
 def remove_face_from_collection(imageId):
     """remove_face_from_collection() : Removes a face from the rekognition collection.
@@ -60,8 +63,8 @@ def remove_face_from_collection(imageId):
 
     # Delete Object
     deletedResponse = client.delete_faces(
-        CollectionId = commons.FACE_RECOG_COLLECTION,
-        FaceIds = [foundFace['FaceId']]
+        CollectionId=commons.FACE_RECOG_COLLECTION,
+        FaceIds=[foundFace['FaceId']]
     )
 
     # Verify face was deleted
@@ -74,6 +77,7 @@ def remove_face_from_collection(imageId):
 
     print(f"[SUCCESS] {imageId} was successfully removed from the collection!")
     return foundFace
+
 
 def add_face_to_collection(imagePath, s3Name=None):
     """add_face_to_collection() : Retrieves an image and indexes it to a rekognition collection, ready for examination.
@@ -102,12 +106,12 @@ def add_face_to_collection(imagePath, s3Name=None):
         with open(imagePath, "rb") as fileBytes:
             print(f"[INFO] Indexing local image {imagePath} with collection object name {objectName}")
             response = client.index_faces(
-                CollectionId = commons.FACE_RECOG_COLLECTION,
-                Image = { 'Bytes' : fileBytes.read() },
-                ExternalImageId = objectName,
-                MaxFaces = 1,
-                QualityFilter = "AUTO",
-                DetectionAttributes = ['ALL']
+                CollectionId=commons.FACE_RECOG_COLLECTION,
+                Image={'Bytes': fileBytes.read()},
+                ExternalImageId=objectName,
+                MaxFaces=1,
+                QualityFilter="AUTO",
+                DetectionAttributes=['ALL']
             )
 
     else:
@@ -115,15 +119,15 @@ def add_face_to_collection(imagePath, s3Name=None):
         print(f"[WARNING] {imagePath} does not exist as a local file. Attempting to retrieve the image using the same path from S3 with object name {objectName}")
         try:
             response = client.index_faces(
-                CollectionId = commons.FACE_RECOG_COLLECTION,
-                Image = { 'S3Object' : {
-                    'Bucket' : commons.FACE_RECOG_BUCKET,
-                    'Name' : imagePath
-                } },
-                ExternalImageId = objectName,
-                MaxFaces = 1,
-                QualityFilter = "AUTO",
-                DetectionAttributes = ['ALL']
+                CollectionId=commons.FACE_RECOG_COLLECTION,
+                Image={'S3Object': {
+                    'Bucket': commons.FACE_RECOG_BUCKET,
+                    'Name': imagePath
+                }},
+                ExternalImageId=objectName,
+                MaxFaces=1,
+                QualityFilter="AUTO",
+                DetectionAttributes=['ALL']
             )
         except client.exceptions.InvalidS3ObjectException:
             return commons.respond(
@@ -136,6 +140,7 @@ def add_face_to_collection(imagePath, s3Name=None):
     print(f"[SUCCESS] {imagePath} was successfully added to the collection with image id {objectName}")
     return json.dumps(response['FaceRecords'][0])
 
+
 #########
 # START #
 #########
@@ -147,17 +152,20 @@ def main(argv):
         description="Adds a face from S3 or local drive to a rekognition collection",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    argumentParser.add_argument("-a", "--action",
+    argumentParser.add_argument(
+        "-a", "--action",
         required=True,
         choices=["add", "delete"],
         help="""Action to be conducted on the --file. Only one action can be performed at one time:\n\nadd: Adds the --file to the collection. --name can optionally be added if the name of the --file is not what it should be in S3.\n\ndelete: Deletes the --file inside the collection.\n\nNote: There is no edit/rename action as collections don't support image renaming or deletion. If you wish to rename an image, delete the original and create a new one.
         """
     )
-    argumentParser.add_argument("-f", "--file",
+    argumentParser.add_argument(
+        "-f", "--file",
         required=True,
         help="Full path to a jpg or png image file (s3 or local) to add to collection OR (if deleting) the file or username of the face to delete"
     )
-    argumentParser.add_argument("-n", "--name",
+    argumentParser.add_argument(
+        "-n", "--name",
         required=False,
         help="ID that the image will have inside the collection. If not specified then the filename is used"
     )
@@ -186,6 +194,7 @@ def main(argv):
             content=response,
             code=0
         )
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

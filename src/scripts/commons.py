@@ -5,8 +5,8 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
-import sys
 import os
+import sys
 import json
 
 # GLOBAL VARIABLES USED BY ALL SCRIPTS
@@ -16,8 +16,8 @@ FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
 CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
 CAMERA_STREAM_NAME = "CameraVideoStream"
 GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
+RESPONSE_FILE_PATH = f"{os.path.dirname(os.path.realpath(__file__))}/response.json"
 
-THROWABLE_OUTCOMES = ["ERROR", "EXCEPTION"]
 
 def respond(messageType, code, message, content=None):
     """respond() : Print/return informational JSON message and sometimes terminate execution
@@ -28,20 +28,20 @@ def respond(messageType, code, message, content=None):
     """
     jsonMessage = json.dumps(
         obj={
-            "TYPE"    : messageType,
-            "MESSAGE" : message,
-            "CONTENT" : json.dumps(content),
-            "CODE"    : code
+            "TYPE": messageType,
+            "MESSAGE": message,
+            "CONTENT": json.dumps(content),
+            "CODE": code
         },
         indent=2
     )
     print(jsonMessage)
 
-    if messageType in THROWABLE_OUTCOMES:
-        # Replace response file and exit
-        with open("response.json", "w") as logfile:
-            logfile.write(jsonMessage)
-        sys.exit(code)
+    # Replace response file and exit
+    with open(RESPONSE_FILE_PATH, "w") as logfile:
+        logfile.write(jsonMessage)
+    sys.exit(code)
+
 
 def parseObjectName(fileName):
     """parseObjectName() : Produces a single word identifier for an image
@@ -57,6 +57,7 @@ def parseObjectName(fileName):
 
     return objectName
 
+
 def parseImageObject(objectName):
     """parseImageObject() : Ensures that an object name is an image and appends jpg if it isn't
     :param objectName: Objectname to be checked and modified
@@ -67,4 +68,3 @@ def parseImageObject(objectName):
         return f"{objectName}.jpg"
     else:
         return objectName
-

@@ -2,6 +2,10 @@
   "name": "eye-of-horus",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/M-Davies/eye-of-horus.git"
+  },
   "dependencies": {
     "@testing-library/jest-dom": "^5.11.8",
     "@testing-library/react": "^11.2.2",
@@ -15,7 +19,10 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "pyinstall": "pip install -r src/scripts/requirements.txt",
+    "test": "ROOT_DIR=. pytest -q --log-cli-level=INFO && react-scripts test",
+    "jstest": "ROOT_DIR=. react-scripts test",
+    "pytest": "ROOT_DIR=$PWD pytest -q --log-cli-level=INFO",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
