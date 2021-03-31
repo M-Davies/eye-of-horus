@@ -5,15 +5,17 @@
 # Released under GNU GPL v3 License
 # -----------------------------------------------------------
 
-import pytest
 from dotenv import load_dotenv
 load_dotenv()
+
 
 class TestAwsS3:
     pass
 
+
 class TestAwsKinesis:
     pass
+
 
 class TestAwsRekognition:
     pass

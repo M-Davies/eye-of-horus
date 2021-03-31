@@ -6,23 +6,22 @@
 # -----------------------------------------------------------
 
 import boto3
-rekog = boto3.client("rekognition")
-kinesis = boto3.client("kinesis")
-knVideo = boto3.client("kinesisvideo")
 import botocore
+import os
+import json
+import sys
 
 from dotenv import load_dotenv
 load_dotenv()
 
-import os
-import argparse
-import json
-import base64
-
-import sys
 sys.path.append(os.path.dirname(__file__) + "/..")
-import commons
-import time
+import commons  # noqa: E402
+import time  # noqa: E402
+
+rekog = boto3.client("rekognition")
+kinesis = boto3.client("kinesis")
+knVideo = boto3.client("kinesisvideo")
+
 
 def examineFace(record):
     """
@@ -43,10 +42,11 @@ def examineFace(record):
         return matchedFaces[0]
     # Find the greatest confident face if there is more than one
     elif len(matchedFaces) > 1:
-        return max(matchedFaces, key = lambda ev: ev["Similarity"])
+        return max(matchedFaces, key=lambda ev: ev["Similarity"])
     # Just return nothing if no faces were found
     else:
         return None
+
 
 def createShardIterator(shardId):
     """
@@ -57,10 +57,11 @@ def createShardIterator(shardId):
     :return: The shard iterator ID
     """
     return kinesis.get_shard_iterator(
-        StreamName = commons.CAMERA_DATASTREAM_NAME,
-        ShardId = shardId,
-        ShardIteratorType = "LATEST"
+        StreamName=commons.CAMERA_DATASTREAM_NAME,
+        ShardId=shardId,
+        ShardIteratorType="LATEST"
     )["ShardIterator"]
+
 
 def examineShard(shardJson):
     """
@@ -71,12 +72,12 @@ def examineShard(shardJson):
     iterator = createShardIterator(shardJson["ShardId"])
     faceFound = None
 
-    while faceFound == None:
+    while faceFound is None:
         try:
             # Get data from stream using the created iterator
             try:
                 records = kinesis.get_records(
-                    ShardIterator = iterator
+                    ShardIterator=iterator
                 )
             except botocore.exceptions.HTTPClientError:
                 # Special case as when the signal handler cancels the script during a get records, it will raise this exception
@@ -92,7 +93,7 @@ def examineShard(shardJson):
                 for record in records["Records"]:
                     faceFound = examineFace(record)
 
-                    if faceFound != None:
+                    if faceFound is not None:
                         break
 
         # API is being spammed. Sleep to let it recover
@@ -106,6 +107,7 @@ def examineShard(shardJson):
 
     return faceFound
 
+
 #########
 # START #
 #########
@@ -115,7 +117,7 @@ def checkForFaces():
     # Create & Start/Restart Stream Processer if it hasn"t been already
     try:
         processor = rekog.describe_stream_processor(
-            Name = commons.FACE_RECOG_PROCESSOR
+            Name=commons.FACE_RECOG_PROCESSOR
         )
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} already exists")
     except rekog.exceptions.ResourceNotFoundException:
@@ -140,21 +142,19 @@ def checkForFaces():
             },
             RoleArn=os.getenv("ROLE_ARN")
         )
-        processor = rekog.describe_stream_processor(Name = commons.FACE_RECOG_PROCESSOR)
+        processor = rekog.describe_stream_processor(Name=commons.FACE_RECOG_PROCESSOR)
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
 
     if processor["Status"] != "RUNNING":
         print(f"[INFO] Starting Rekognition Stream Processor {commons.FACE_RECOG_PROCESSOR}...")
-        rekog.start_stream_processor(
-            Name = commons.FACE_RECOG_PROCESSOR
-        )
+        rekog.start_stream_processor(Name=commons.FACE_RECOG_PROCESSOR)
     else:
         print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} is already running")
 
     # Get latest shards
     shards = kinesis.list_shards(
-        StreamName = commons.CAMERA_DATASTREAM_NAME,
-        ShardFilter = {
+        StreamName=commons.CAMERA_DATASTREAM_NAME,
+        ShardFilter={
             "Type": "AT_LATEST"
         }
     )["Shards"]
@@ -165,4 +165,3 @@ def checkForFaces():
 
     # We will always return a successfull face or be forcibly aborted by the manager timeout
     return matchedFace
-

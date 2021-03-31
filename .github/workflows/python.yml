@@ -1,0 +1,37 @@
+name: Python Setup & Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Setup & Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9.x'
+    - name: Show Version & Install Dependencies
+      run: |
+        python -c "import sys; print(sys.version)"
+        python -m pip install --upgrade pip
+        pip install wheel
+        pip install -r src/scripts/requirements.txt
+    - name: Configure AWS
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.SECRET_KEY }}
+        aws-region: eu-west-1
+    - name: PyTest
+      env:
+        ROLE_ARN: ${{ secrets.ROLE_ARN }}
+        PROJECT_ARN: ${{ secrets.PROJECT_ARN }}
+        LATEST_MODEL_ARN: ${{ secrets.LATEST_MODEL_ARN }}
+        LATEST_MODEL_VERSION: ${{ secrets.LATEST_MODEL_VERSION }}
+      run: |
+        npm run pytest

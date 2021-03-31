@@ -139,6 +139,7 @@ class TestManagerCreate:
 
     # Checks failed create action on missing lock/unlock gesture file
     def test_user_gesture_not_exist_fail(self):
+        # Lock
         logger.info("[TESTING] test_user_gesture_not_exist_fail...")
         args = parseArgs([
             "-m",
@@ -150,8 +151,9 @@ class TestManagerCreate:
         ])
         with pytest.raises(SystemExit):
             main(args)
-        assert readResponseFile()['CODE'] == 7
+        assert readResponseFile()['CODE'] == 17
 
+        # Unlock
         args = parseArgs([
             "-m",
             "-a", "create",
@@ -162,7 +164,7 @@ class TestManagerCreate:
         ])
         with pytest.raises(SystemExit):
             main(args)
-        assert readResponseFile()['CODE'] == 13
+        assert readResponseFile()['CODE'] == 17
 
     # Checks failed create action on broken combination rules lock/unlock gesture file
     def test_user_gesture_rule_broken_fail_on_create(self):
@@ -237,7 +239,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "testuser",
-            "-u", f"{TEST_IMAGE_DIR}/test_lock_4.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg"
+            "-u", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -249,7 +251,7 @@ class TestManagerEdit:
             "-a", "edit",
             "-p", "testuser",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
-            "-u", f"{TEST_IMAGE_DIR}/test_lock_4.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg"
+            "-u", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -264,7 +266,7 @@ class TestManagerEdit:
             "-p", "testuser",
             "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
-            "-u", f"{TEST_IMAGE_DIR}/test_lock_4.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg"
+            "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -315,7 +317,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg"
+            "-f", f"{TEST_IMAGE_DIR}/placeholder.txt"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -328,7 +330,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "testuser",
-            "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
+            "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -407,10 +409,9 @@ class TestManagerDelete:
 
 
 # After running tests, shutdown project
-# @pytest.fixture(scope="session")
-# def teardown_module(__name__):
-#     logger.info("[INFO] All tests completed, shutting down rekog project...")
-#     try:
-#         projectHandler(False)
-#     except SystemExit:
-#         pass
+def teardown_module(__name__):
+    logger.info("[INFO] All tests completed, shutting down rekog project...")
+    try:
+        projectHandler(False)
+    except SystemExit:
+        pass

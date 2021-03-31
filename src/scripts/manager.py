@@ -186,10 +186,15 @@ def timeoutHandler(signum, stackFrame):
 
 def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None):
     """adjustConfigFramework() : Modifies a gesture configuration file according to the user's edit changes
+
     :param imagePaths: New gesture paths to add
+
     :param username: User's config file to update
+
     :param locktype: Lock or unlock combination to update
+
     :param previousFramework: If a lock gesture has been generated, use it to run the tests in the downstream construction
+
     :return: Updated config dictionary
     """
     # Retrieve old configuration file
@@ -244,10 +249,15 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None
 
 def constructGestureFramework(imagePaths, username, locktype, previousFramework=None):
     """constructGestureFramework() : Uploads gesture recognition images and config file to the user's S3 folder
+
     :param imagePaths: List of images paths or gesture types (in combination order)
+
     :param username: Username as per their s3 folder
+
     :param locktype: Either lock or unlock (usually), depicts which combination the images are a part of
+
     :param previousFramework: If a framework has already been created, we will run tests against both it and the soon to be created framework in tandem
+
     :returns: A completed gestures.json config
     """
     position = 1
@@ -298,7 +308,7 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
             if gestureType not in gestureTypes:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{gestureType} is not a valid gesture type. Valid gesture types = {gestureTypes}",
+                    message=f"{gestureType} is not an existing file or valid gesture type. Valid gesture types = {gestureTypes}",
                     code=17
                 )
             else:
@@ -495,7 +505,10 @@ def main(parsedArgs=None):
 
         # Upload face
         try:
-            upload_file(argDict.face, argDict.profile, None, argDict.name)
+            if argDict.name is not None:
+                upload_file(argDict.face, argDict.profile, None, argDict.name)
+            else:
+                upload_file(argDict.face, argDict.profile, None, f"{argDict.profile}.jpg")
         except FileNotFoundError:
             return commons.respond(
                 messageType="ERROR",
@@ -609,14 +622,21 @@ def main(parsedArgs=None):
                 # Start gesture project to allow for gesture recognition
                 gesture_recog.projectHandler(True)
 
-                adjustedLock = None
-                if argDict.lock is not None:
+                if argDict.lock is not None and argDict.unlock is not None:
+                    # We are editing both combinations so run rules and construction sequentially
                     adjustedLock = adjustConfigFramework(argDict.lock, argDict.profile, "lock")
                     print(f"[SUCCESS] Lock gesture combination has been successfully replaced for user {argDict.profile}")
-
-                if argDict.unlock is not None:
                     adjustConfigFramework(argDict.unlock, argDict.profile, "unlock", adjustedLock["lock"])
                     print(f"[SUCCESS] Unlock gesture combination has been successfully replaced for user {argDict.profile}")
+                else:
+                    # Get user config to compare edited rules against
+                    currentConfig = gesture_recog.getUserCombinationFile(argDict.profile)
+                    if argDict.lock is not None:
+                        adjustConfigFramework(argDict.lock, argDict.profile, "lock", currentConfig["unlock"])
+                        print(f"[SUCCESS] Lock gesture combination has been successfully replaced for user {argDict.profile}")
+                    else:
+                        adjustConfigFramework(argDict.unlock, argDict.profile, "unlock", currentConfig["lock"])
+                        print(f"[SUCCESS] Unlock gesture combination has been successfully replaced for user {argDict.profile}")
 
             finally:
                 if argDict.maintain is False:
@@ -648,7 +668,7 @@ def main(parsedArgs=None):
 
         # Check the user's folder actually exists in s3
         print(f"[INFO] Deleting user folder for {argDict.profile} from s3...")
-        s3FilePath = f"users/{argDict.profile}/"
+        s3FilePath = f"users/{argDict.profile}/{argDict.profile}.jpg"
         try:
             s3Client.get_object_acl(
                 Bucket=commons.FACE_RECOG_BUCKET,
