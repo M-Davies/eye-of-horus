@@ -2,6 +2,12 @@
   text-align: center;
 }
 
+.main-container, html {
+  background-color: gray;
+  height: 100%;
+  width: 100%;
+}
+
 .App-logo {
   height: 40vmin;
   pointer-events: none;
@@ -26,6 +32,22 @@
 
 .App-link {
   color: #61dafb;
+}
+
+#home_header {
+  font-family: 'Dancing Script', cursive;
+  font-size: 80px;
+  color: white;
+  padding-top: 2%;
+  padding-bottom: 2%;
+}
+
+#home_subheader {
+  font-family: 'Dancing Script', cursive;
+  font-size: 50px;
+  color: white;
+  margin-top: 2%;
+  margin-bottom: 2%;
 }
 
 @keyframes App-logo-spin {
