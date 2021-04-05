@@ -11,17 +11,19 @@
     "@testing-library/react": "^11.2.2",
     "@testing-library/user-event": "^12.6.0",
     "bootstrap": "^4.6.0",
+    "cors": "^2.8.5",
     "react": "^17.0.2",
     "react-bootstrap": "^1.4.3",
     "react-dom": "^17.0.2",
+    "react-router-dom": "^5.2.0",
     "react-scripts": "4.0.1"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "pyinstall": "pip install -r src/scripts/requirements.txt",
-    "test": "ROOT_DIR=. pytest -q --log-cli-level=INFO && react-scripts test",
-    "jstest": "ROOT_DIR=. react-scripts test",
+    "test": "ROOT_DIR=$PWD pytest -q --log-cli-level=INFO && react-scripts test",
+    "jstest": "ROOT_DIR=$PWD react-scripts test",
     "pytest": "ROOT_DIR=$PWD pytest -q --log-cli-level=INFO",
     "eject": "react-scripts eject"
   },

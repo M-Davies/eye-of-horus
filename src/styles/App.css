@@ -1,8 +1,5 @@
-.App {
+.App, html{
   text-align: center;
-}
-
-.main-container, html {
   background-color: gray;
   height: 100%;
   width: 100%;

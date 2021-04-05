@@ -1,26 +1,40 @@
 import NavbarComponent from './components/navbar'
 import LoginComponent from './components/login'
+import DashboardComponent from './components/dashboard'
+import Token from './components/token'
 
-import './styles/App.css';
+import './styles/App.css'
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import React, { Component } from 'react';
-import Dropdown from 'react-bootstrap/Dropdown'
+import 'bootstrap/dist/css/bootstrap.min.css'
+import React from 'react'
+import { BrowserRouter, Route, Switch } from 'react-router-dom'
 
-export default class App extends Component {
-  render() {
+export default function App() {
+    const { token, setToken } = Token();
+
+    if(!token) {
+        return (
+            <div className="anon-wrapper">
+                <NavbarComponent></NavbarComponent>
+                <LoginComponent setToken={setToken} />
+            </div>
+        )
+    }
+
     return (
-      <div className="App">
-        <div className="nav-container">
-          <NavbarComponent></NavbarComponent>
+        <div className="App">
+            <div className="nav-container">
+                <NavbarComponent></NavbarComponent>
+            </div>
+            <div className="main-container">
+                <BrowserRouter>
+                    <Switch>
+                        <Route path="/dashboard">
+                            <DashboardComponent></DashboardComponent>
+                        </Route>
+                    </Switch>
+                </BrowserRouter>
+            </div>
         </div>
-        <div className="main-container">
-          <h1 id="home_header">SEEING IS BELIEVING</h1>
-          <Dropdown.Divider />
-          <h2 id="home_subheader">Welcome to the Eye of Horus, a multi-factor biometric authentication system! Please create or login to an account below to get started</h2>
-          <LoginComponent></LoginComponent>
-        </div>
-      </div>
     )
-  }
 }
