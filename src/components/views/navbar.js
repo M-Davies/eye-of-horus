@@ -7,7 +7,7 @@ export default class NavbarComponent extends Component {
     return (
       <div className="navbar-wrapper">
         <Navbar bg="dark" variant="dark">
-          <Navbar.Brand href="/home">
+          <Navbar.Brand href="/">
             <img
               alt=""
               src="/eye-of-horus.png"
@@ -19,7 +19,6 @@ export default class NavbarComponent extends Component {
             </Navbar.Brand>
           <Navbar.Collapse className="justify-content-end">
             <Nav className="auto">
-              <Nav.Link href="/about">About Us</Nav.Link>
               <Nav.Link href="/login">Signed in as: User</Nav.Link>
             </Nav>
           </Navbar.Collapse>
@@ -28,17 +27,3 @@ export default class NavbarComponent extends Component {
     )
   }
 }
-
-// export default function NavbarComponent() {
-//   return (
-//     <Navbar bg="dark" variant="dark">
-//       <Navbar.Brand href="#home">Eye Of Horus</Navbar.Brand>
-//       <Navbar.Collapse className="justify-content-end">
-//         <Nav className="mr-auto">
-//           <Nav.Link href="/about">About Us</Nav.Link>
-//           <Navbar.Link href="/login">Signed in as: User</Navbar.Link>
-//         </Nav>
-//       </Navbar.Collapse>
-//     </Navbar>
-//   )
-// }

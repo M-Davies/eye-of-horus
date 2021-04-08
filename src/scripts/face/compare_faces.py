@@ -57,7 +57,7 @@ def createShardIterator(shardId):
     :return: The shard iterator ID
     """
     return kinesis.get_shard_iterator(
-        StreamName=commons.CAMERA_DATASTREAM_NAME,
+        StreamName=os.getenv('CAMERA_DATASTREAM_NAME'),
         ShardId=shardId,
         ShardIteratorType="LATEST"
     )["ShardIterator"]
@@ -117,43 +117,43 @@ def checkForFaces():
     # Create & Start/Restart Stream Processer if it hasn"t been already
     try:
         processor = rekog.describe_stream_processor(
-            Name=commons.FACE_RECOG_PROCESSOR
+            Name=os.getenv('FACE_RECOG_PROCESSOR')
         )
-        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} already exists")
+        print(f"[SUCCESS] {os.getenv('FACE_RECOG_PROCESSOR')} already exists")
     except rekog.exceptions.ResourceNotFoundException:
-        print(f"[WARNING] {commons.FACE_RECOG_PROCESSOR} does not appear to exist. Creating now...")
+        print(f"[WARNING] {os.getenv('FACE_RECOG_PROCESSOR')} does not appear to exist. Creating now...")
         rekog.create_stream_processor(
             Input={
                 "KinesisVideoStream": {
-                    "Arn": knVideo.describe_stream(StreamName=commons.CAMERA_STREAM_NAME)["StreamInfo"]["StreamARN"]
+                    "Arn": knVideo.describe_stream(StreamName=os.getenv('CAMERA_STREAM_NAME'))["StreamInfo"]["StreamARN"]
                 }
             },
             Output={
                 "KinesisDataStream": {
-                    "Arn": kinesis.describe_stream(StreamName=commons.CAMERA_DATASTREAM_NAME)["StreamDescription"]["StreamARN"]
+                    "Arn": kinesis.describe_stream(StreamName=os.getenv('CAMERA_DATASTREAM_NAME'))["StreamDescription"]["StreamARN"]
                 }
             },
-            Name=commons.FACE_RECOG_PROCESSOR,
+            Name=os.getenv('FACE_RECOG_PROCESSOR'),
             Settings={
                 "FaceSearch": {
-                    "CollectionId": commons.FACE_RECOG_COLLECTION,
+                    "CollectionId": os.getenv('FACE_RECOG_COLLECTION'),
                     "FaceMatchThreshold": 90
                 }
             },
             RoleArn=os.getenv("ROLE_ARN")
         )
-        processor = rekog.describe_stream_processor(Name=commons.FACE_RECOG_PROCESSOR)
-        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} has been successfully created!")
+        processor = rekog.describe_stream_processor(Name=os.getenv('FACE_RECOG_PROCESSOR'))
+        print(f"[SUCCESS] {os.getenv('FACE_RECOG_PROCESSOR')} has been successfully created!")
 
     if processor["Status"] != "RUNNING":
-        print(f"[INFO] Starting Rekognition Stream Processor {commons.FACE_RECOG_PROCESSOR}...")
-        rekog.start_stream_processor(Name=commons.FACE_RECOG_PROCESSOR)
+        print(f"[INFO] Starting Rekognition Stream Processor {os.getenv('FACE_RECOG_PROCESSOR')}...")
+        rekog.start_stream_processor(Name=os.getenv('FACE_RECOG_PROCESSOR'))
     else:
-        print(f"[SUCCESS] {commons.FACE_RECOG_PROCESSOR} is already running")
+        print(f"[SUCCESS] {os.getenv('FACE_RECOG_PROCESSOR')} is already running")
 
     # Get latest shards
     shards = kinesis.list_shards(
-        StreamName=commons.CAMERA_DATASTREAM_NAME,
+        StreamName=os.getenv('CAMERA_DATASTREAM_NAME'),
         ShardFilter={
             "Type": "AT_LATEST"
         }

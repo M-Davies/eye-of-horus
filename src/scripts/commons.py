@@ -8,15 +8,8 @@
 import os
 import sys
 import json
-
-# GLOBAL VARIABLES USED BY ALL SCRIPTS
-FACE_RECOG_BUCKET = "eye-of-horus-bucket"
-FACE_RECOG_COLLECTION = "RekognitionCollection"
-FACE_RECOG_PROCESSOR = "CameraStreamProcessor"
-CAMERA_DATASTREAM_NAME = "AmazonRekognitionCameraDataStream"
-CAMERA_STREAM_NAME = "CameraVideoStream"
-GESTURE_RECOG_PROJECT_NAME = "eye-of-horus-gesture-project"
-RESPONSE_FILE_PATH = f"{os.path.dirname(os.path.realpath(__file__))}/response.json"
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def respond(messageType, code, message, content=None):
@@ -38,7 +31,7 @@ def respond(messageType, code, message, content=None):
     print(jsonMessage)
 
     # Replace response file and exit
-    with open(RESPONSE_FILE_PATH, "w") as logfile:
+    with open(os.getenv("RESPONSE_FILE_PATH"), "w") as logfile:
         logfile.write(jsonMessage)
     sys.exit(code)
 

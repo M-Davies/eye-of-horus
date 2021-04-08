@@ -13,11 +13,13 @@ import os
 import argparse
 import json
 from PIL import Image
+from dotenv import load_dotenv
 
 import sys
 sys.path.append(os.path.dirname(__file__) + "/..")
 
 client = boto3.client('rekognition')
+load_dotenv()
 
 
 def faceInCollection(faceId):
@@ -26,7 +28,7 @@ def faceInCollection(faceId):
     :returns: Matched rekognition collection object
     """
     faces = client.list_faces(
-        CollectionId=commons.FACE_RECOG_COLLECTION,
+        CollectionId=os.getenv('FACE_RECOG_COLLECTION'),
     )['Faces']
 
     foundFace = {}
@@ -63,7 +65,7 @@ def remove_face_from_collection(imageId):
 
     # Delete Object
     deletedResponse = client.delete_faces(
-        CollectionId=commons.FACE_RECOG_COLLECTION,
+        CollectionId=os.getenv('FACE_RECOG_COLLECTION'),
         FaceIds=[foundFace['FaceId']]
     )
 
@@ -106,7 +108,7 @@ def add_face_to_collection(imagePath, s3Name=None):
         with open(imagePath, "rb") as fileBytes:
             print(f"[INFO] Indexing local image {imagePath} with collection object name {objectName}")
             response = client.index_faces(
-                CollectionId=commons.FACE_RECOG_COLLECTION,
+                CollectionId=os.getenv('FACE_RECOG_COLLECTION'),
                 Image={'Bytes': fileBytes.read()},
                 ExternalImageId=objectName,
                 MaxFaces=1,
@@ -119,9 +121,9 @@ def add_face_to_collection(imagePath, s3Name=None):
         print(f"[WARNING] {imagePath} does not exist as a local file. Attempting to retrieve the image using the same path from S3 with object name {objectName}")
         try:
             response = client.index_faces(
-                CollectionId=commons.FACE_RECOG_COLLECTION,
+                CollectionId=os.getenv('FACE_RECOG_COLLECTION'),
                 Image={'S3Object': {
-                    'Bucket': commons.FACE_RECOG_BUCKET,
+                    'Bucket': os.getenv('FACE_RECOG_BUCKET'),
                     'Name': imagePath
                 }},
                 ExternalImageId=objectName,

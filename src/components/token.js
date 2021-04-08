@@ -1,20 +1,20 @@
 import { useState } from 'react';
 
-export default function Token() {
-    const getToken = () => {
-        const userToken = JSON.parse(sessionStorage.getItem('token'));
-        return userToken?.token
+export default function TokenComponent() {
+    const getUserExist = () => {
+        const userExists = Boolean(localStorage.getItem('exists'));
+        return Boolean(userExists?.exists)
     }
 
-    const [token, setToken] = useState(getToken())
+    const [exists, setUserExists] = useState(getUserExist())
 
-    const saveToken = userToken => {
-        sessionStorage.setItem('token', JSON.stringify(userToken));
-        setToken(userToken.token);
+    const saveUserExist = userExists => {
+        localStorage.setItem('exists', Boolean(userExists));
+        setUserExists(Boolean(userExists.exists));
     }
 
     return {
-        setToken: saveToken,
-        token
+        setUserExists: saveUserExist,
+        exists
     }
 }

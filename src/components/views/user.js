@@ -3,36 +3,44 @@ import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import PropTypes from 'prop-types';
 
-import '../styles/login.css'
+import '../../styles/login.css'
 
-async function loginUser(credentials) {
-    return fetch(`http://localhost:3001/login`, {
+async function userExists(username) {
+    return fetch(`http://localhost:3001/login/exists`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify(username)
     })
-        .then(data => data.json())
+    .then(data => data.json())
+    .then(data => {
+        if (data === true) {
+            return true
+        } else {
+            return false
+        }
+    })
+    .catch((error) => {
+        console.error(error)
+    })
 }
 
-export default function LoginComponent({ setToken }) {
+export default function UserComponent({ setUserExists }) {
     const [username, setUserName] = useState();
 
     const handleSubmit = async e => {
         e.preventDefault()
-        const token = await loginUser({
-            username
-        })
 
-        setToken(token)
+        const exists = await userExists({username})
+        setUserExists(exists)
     }
 
     return (
         <div className="login-wrapper">
             <div className="login-headers">
-                <h1 id="home_header">SEEING IS BELIEVING</h1>
-                <h2 id="home_subheader">Welcome to the Eye of Horus, a multi-factor biometric authentication system! Please create or login to an account below to get started</h2>
+                <h1>SEEING IS BELIEVING</h1>
+                <h2>Welcome to the Eye of Horus, a multi-factor biometric authentication system! Please create or login to an account below to get started</h2>
             </div>
             <div className="login-forms">
                 <Form onSubmit={handleSubmit}>
@@ -49,6 +57,6 @@ export default function LoginComponent({ setToken }) {
     )
 }
 
-LoginComponent.propTypes = {
-    setToken: PropTypes.func.isRequired
+UserComponent.propTypes = {
+    setUserExists: PropTypes.func.isRequired
 }

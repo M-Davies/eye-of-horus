@@ -46,7 +46,7 @@ class TestManagerCreate:
             "-a", "create",
             "-m",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg"
         ])
@@ -60,7 +60,7 @@ class TestManagerCreate:
         args = parseArgs([
             "-m",
             "-a", "create",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
         ])
@@ -119,7 +119,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
         ])
         with pytest.raises(SystemExit):
@@ -130,7 +130,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg"
         ])
         with pytest.raises(SystemExit):
@@ -145,7 +145,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/foobar.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
         ])
@@ -158,7 +158,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/foobar.jpg"
         ])
@@ -173,7 +173,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg"
         ])
@@ -185,7 +185,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg"
         ])
@@ -197,7 +197,7 @@ class TestManagerCreate:
             "-m",
             "-a", "create",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_lock_4.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_1.jpg"
         ])
@@ -214,7 +214,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg"
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
@@ -264,7 +264,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "testuser",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg",
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg",
             "-l", f"{TEST_IMAGE_DIR}/test_lock_1.jpg", f"{TEST_IMAGE_DIR}/test_lock_2.jpg", f"{TEST_IMAGE_DIR}/test_lock_3.jpg", f"{TEST_IMAGE_DIR}/test_lock_4.jpg",
             "-u", f"{TEST_IMAGE_DIR}/test_unlock_1.jpg", f"{TEST_IMAGE_DIR}/test_unlock_4.jpg", f"{TEST_IMAGE_DIR}/test_unlock_2.jpg", f"{TEST_IMAGE_DIR}/test_unlock_3.jpg"
         ])
@@ -291,7 +291,7 @@ class TestManagerEdit:
             "-m",
             "-a", "edit",
             "-p", "foobar",
-            "-f", f"{TEST_IMAGE_DIR}/test_face.jpg"
+            "-f", f"{TEST_IMAGE_DIR}/testuser.jpg"
         ])
         with pytest.raises(SystemExit):
             main(args)
