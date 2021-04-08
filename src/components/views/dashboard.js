@@ -1,9 +1,12 @@
-import React, { Component } from 'react'
+import React from 'react'
+import PropTypes from 'prop-types';
 
-export default class DashboardComponent extends Component {
-  render() {
+export default function UserComponent({ username }) {
     return (
-      <h1>Dashboard</h1>
+        <h1>Welcome {username}</h1>
     )
-  }
+}
+
+UserComponent.propTypes = {
+    username: PropTypes.string.isRequired
 }

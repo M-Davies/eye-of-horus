@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
-import PropTypes from 'prop-types';
+import PropTypes from 'prop-types'
 
 import '../../styles/login.css'
 
@@ -26,14 +26,13 @@ async function userExists(username) {
     })
 }
 
-export default function UserComponent({ setUserExists }) {
-    const [username, setUserName] = useState();
+export default function UserComponent({ setUsername, setUserExists }) {
+    const [username, setName] = useState();
 
     const handleSubmit = async e => {
         e.preventDefault()
-
-        const exists = await userExists({username})
-        setUserExists(exists)
+        setUsername(username)
+        setUserExists(await userExists(username))
     }
 
     return (
@@ -46,7 +45,7 @@ export default function UserComponent({ setUserExists }) {
                 <Form onSubmit={handleSubmit}>
                     <Form.Group controlId="formBasicText">
                         <Form.Label id="form_label">Username</Form.Label>
-                        <Form.Control type="text" placeholder="Enter username" onChange={e => setUserName(e.target.value)}/>
+                        <Form.Control type="text" placeholder="Enter username" onChange={e => setName(e.target.value)}/>
                     </Form.Group>
                     <Button variant="primary" type="submit" onClick={handleSubmit}>
                         Submit
@@ -58,5 +57,6 @@ export default function UserComponent({ setUserExists }) {
 }
 
 UserComponent.propTypes = {
+    setUsername: PropTypes.func.isRequired,
     setUserExists: PropTypes.func.isRequired
 }

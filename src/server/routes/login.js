@@ -1,7 +1,6 @@
 var express = require("express")
 var router = express.Router()
 var cors = require('cors')
-var spawn = require('child_process').spawn
 var AWS = require('aws-sdk')
 
 var S3 = new AWS.S3()

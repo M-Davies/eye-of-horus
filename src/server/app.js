@@ -8,10 +8,6 @@ var AWS = require('aws-sdk')
 // Custom path for .env config as it defaults to the server dir
 require('dotenv').config({ path: `${path.resolve(process.cwd())}/../../.env` })
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var loginRouter = require("./routes/login");
-
 var app = express();
 
 // View engine setup
@@ -26,12 +22,13 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // AWS Setup
-AWS.config.credentials = new AWS.SharedIniFileCredentials({profile: process.env.PROFILE_KEY})
+AWS.config.credentials = new AWS.SharedIniFileCredentials({profile: process.env.PROFILE_KEY});
 AWS.config.update({region: process.env.PROFILE_REGION});
 
 // Route setup
+var indexRouter = require('./routes/index');
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+var loginRouter = require("./routes/login");
 app.use('/login', loginRouter);
 
 // catch 404 and forward to error handler

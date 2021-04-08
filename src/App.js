@@ -1,48 +1,82 @@
 import NavbarComponent from './components/views/navbar'
 import UserComponent from './components/views/user'
+import AuthenticateComponent from './components/views/authenticate'
 import DashboardComponent from './components/views/dashboard'
-import RegisterComponent from './components/views/register'
-import LoginComponent from './components/views/register'
-import TokenComponent from './components/token'
+import { UsernameToken, UserExistsToken, AuthenticatedToken } from './components/token'
 
 import './styles/App.css'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import React from 'react'
-import { BrowserRouter, Route, Switch } from 'react-router-dom'
+// import { BrowserRouter, Route, Switch } from 'react-router-dom'
+import { render } from './server/app'
 
 export default function App() {
-    const { userExists, setUserExists } = TokenComponent()
+    const { username, setUsername } = UsernameToken()
+    const { userExists, setUserExists } = UserExistsToken()
+    const { authenticated, setAuthenticated } = AuthenticatedToken()
 
-    if(!userExists) {
+    render (
+        <div className="nav-container">
+            <NavbarComponent username={username}/>
+        </div>
+    )
+
+    if(!username) {
         return (
-            <div className="anon-wrapper">
-                <NavbarComponent />
-                <UserComponent setUserExists={setUserExists} />
+            <div className="user-wrapper">
+                <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
+            </div>
+        )
+    } else if (!userExists) {
+        return (
+            <div className="register-wrapper">
+                <AuthenticateComponent
+                    username={username}
+                    setUserExists={setUserExists}
+                    setAuthenticated={setAuthenticated}
+                    registering={true}
+                />
+            </div>
+        )
+    } else if (!authenticated) {
+        return (
+            <div className="login-wrapper">
+                <AuthenticateComponent
+                    username={username}
+                    setUserExists={setUserExists}
+                    setAuthenticated={setAuthenticated}
+                    registering={false}
+                />
+            </div>
+        )
+    } else {
+        return (
+            <div className="dashboard-wrapper">
+                <DashboardComponent username={username}/>
             </div>
         )
     }
-
-    return (
-        <div className="App">
-            <div className="nav-container">
-                <NavbarComponent />
-            </div>
-            <div className="main-container">
-                <BrowserRouter>
-                    <Switch>
-                        <Route path="/dashboard">
-                            <DashboardComponent />
-                        </Route>
-                        <Route path="/register">
-                            <RegisterComponent />
-                        </Route>
-                        <Route path="/login">
-                            <LoginComponent />
-                        </Route>
-                    </Switch>
-                </BrowserRouter>
-            </div>
-        </div>
-    )
+    // return (
+    //     <div className="App">
+    //         <div className="main-container">
+    //             <BrowserRouter>
+    //                 <Switch>
+    //                     <Route exact path="/">
+    //                         <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
+    //                     </Route>
+    //                     <Route path="/register">
+    //                         <RegisterComponent />
+    //                     </Route>
+    //                     <Route path="/login">
+    //                         <LoginComponent />
+    //                     </Route>
+    //                     <Route path="/dashboard">
+    //                         <DashboardComponent />
+    //                     </Route>
+    //                 </Switch>
+    //             </BrowserRouter>
+    //         </div>
+    //     </div>
+    // )
 }
