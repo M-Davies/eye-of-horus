@@ -2,6 +2,7 @@ import NavbarComponent from './components/views/navbar'
 import UserComponent from './components/views/user'
 import AuthenticateComponent from './components/views/authenticate'
 import DashboardComponent from './components/views/dashboard'
+import EditComponent from './components/views/edit'
 import { UsernameToken, UserExistsToken, AuthenticatedToken } from './components/token'
 
 import './styles/App.css'
@@ -46,7 +47,10 @@ export default function App() {
                             />
                         </Route>
                         <Route path="/dashboard">
-                            <DashboardComponent/>
+                            <DashboardComponent username={username}/>
+                        </Route>
+                        <Route path="/edit">
+                            <EditComponent username={username}/>
                         </Route>
                     </Switch>
                 </div>

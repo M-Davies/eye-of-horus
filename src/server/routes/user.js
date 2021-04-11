@@ -61,7 +61,7 @@ router.post("/create", function(req, res, next) {
     })
     // On close event we are sure that stream from child process is closed, read response file
     createRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}`);
+        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
     })
 
     // TODO: Parse response from the script
@@ -90,7 +90,7 @@ router.post("/login", function(req, res, next) {
     })
     // On close event we are sure that stream from child process is closed, read response file
     loginRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}`);
+        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
     })
 
     // TODO: Parse response from the script
@@ -119,7 +119,7 @@ router.post("/logout", function(req, res, next) {
     })
     // On close event we are sure that stream from child process is closed, read response file
     logoutRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}`);
+        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
     })
 
     // TODO: Parse response from the script

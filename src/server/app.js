@@ -4,6 +4,7 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var cors = require('cors');
+var fs = require('fs');
 var AWS = require('aws-sdk');
 
 // Custom path for .env config as it defaults to the server dir
@@ -17,7 +18,9 @@ app.set('view engine', 'jade');
 
 // Tooling setup
 app.use(cors());
-app.use(logger('dev'));
+app.use(logger('dev', {
+  stream: fs.createWriteStream('./server.log', {flags: 'w'})
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
