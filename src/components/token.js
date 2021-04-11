@@ -22,7 +22,13 @@ export function UsernameToken() {
 export function UserExistsToken() {
     const getUserExists = () => {
         const existsToken = JSON.parse(localStorage.getItem('exists'));
-        return existsToken?.exists
+        try {
+            return existsToken.exists
+        } catch (err) {
+            if (err instanceof TypeError) {
+                return false
+            }
+        }
     }
 
     const [exists, setUserExists] = useState(getUserExists())
@@ -41,7 +47,13 @@ export function UserExistsToken() {
 export function AuthenticatedToken() {
     const getAuthenticated = () => {
         const authToken = JSON.parse(localStorage.getItem('authenticated'));
-        return authToken?.authenticated
+        try {
+            return authToken.authenticated
+        } catch (err) {
+            if (err instanceof TypeError) {
+                return false
+            }
+        }
     }
 
     const [authenticated, setAuthenticated] = useState(getAuthenticated())

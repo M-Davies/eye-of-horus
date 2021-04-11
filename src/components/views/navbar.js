@@ -6,11 +6,11 @@ import PropTypes from 'prop-types'
 function profileText(username) {
   if (!username) {
     return (
-      <Nav.Link href="/login">Not Signed In</Nav.Link>
+      <Nav.Link href="/login">Sign In</Nav.Link>
     )
   } else {
     return (
-      <Nav.Link href="/logout">Signed in as: {username}</Nav.Link>
+      <Nav.Link href="/logout">Logged in as: {username}</Nav.Link>
     )
   }
 }
