@@ -14,10 +14,11 @@ function readResponse() {
 }
 
 router.post("/exists", function(req, res, next) {
+    console.log(`return body on server side = ${req.body.user}`)
     // Connect to AWS to check if user exists
     S3.getObjectAcl({
         Bucket: process.env.FACE_RECOG_BUCKET,
-        Key: `users/${req.body.username}/${req.body.username}.jpg`
+        Key: `users/${req.body.user}/${req.body.user}.jpg`
     }, function(err, data) {
         if (data && !err) {
             // User exists

@@ -42,5 +42,5 @@ export default class NavbarComponent extends Component {
 }
 
 NavbarComponent.propTypes = {
-  username: PropTypes.string.isRequired
+  username: PropTypes.string
 }

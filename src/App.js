@@ -9,51 +9,64 @@ import './styles/App.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import React from 'react'
 // import { BrowserRouter, Route, Switch } from 'react-router-dom'
-import { render } from './server/app'
 
 export default function App() {
     const { username, setUsername } = UsernameToken()
     const { userExists, setUserExists } = UserExistsToken()
     const { authenticated, setAuthenticated } = AuthenticatedToken()
 
-    render (
-        <div className="nav-container">
-            <NavbarComponent username={username}/>
-        </div>
-    )
-
     if(!username) {
         return (
-            <div className="user-wrapper">
-                <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
+            <div className="app">
+                <div className="nav-container">
+                    <NavbarComponent username={username}/>
+                </div>
+                <div className="user-wrapper">
+                    <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
+                </div>
             </div>
         )
     } else if (!userExists) {
         return (
-            <div className="register-wrapper">
-                <AuthenticateComponent
-                    username={username}
-                    setUserExists={setUserExists}
-                    setAuthenticated={setAuthenticated}
-                    registering={true}
-                />
+            <div className="app">
+                <div className="nav-container">
+                    <NavbarComponent username={username}/>
+                </div>
+                <div className="register-wrapper">
+                    <AuthenticateComponent
+                        username={username}
+                        setUserExists={setUserExists}
+                        setAuthenticated={setAuthenticated}
+                        registering={true}
+                    />
+                </div>
             </div>
         )
     } else if (!authenticated) {
         return (
-            <div className="login-wrapper">
-                <AuthenticateComponent
-                    username={username}
-                    setUserExists={setUserExists}
-                    setAuthenticated={setAuthenticated}
-                    registering={false}
-                />
+            <div className="app">
+                <div className="nav-container">
+                    <NavbarComponent username={username}/>
+                </div>
+                <div className="login-wrapper">
+                    <AuthenticateComponent
+                        username={username}
+                        setUserExists={setUserExists}
+                        setAuthenticated={setAuthenticated}
+                        registering={false}
+                    />
+                </div>
             </div>
         )
     } else {
         return (
-            <div className="dashboard-wrapper">
-                <DashboardComponent username={username}/>
+            <div className="app">
+                <div className="nav-container">
+                    <NavbarComponent username={username}/>
+                </div>
+                <div className="dashboard-wrapper">
+                    <DashboardComponent username={username}/>
+                </div>
             </div>
         )
     }

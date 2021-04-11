@@ -3,7 +3,8 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-var AWS = require('aws-sdk')
+var cors = require('cors');
+var AWS = require('aws-sdk');
 
 // Custom path for .env config as it defaults to the server dir
 require('dotenv').config({ path: `${path.resolve(process.cwd())}/../../.env` })
@@ -15,6 +16,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
 // Tooling setup
+app.use(cors());
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

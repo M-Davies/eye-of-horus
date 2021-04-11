@@ -6,15 +6,19 @@ import PropTypes from 'prop-types'
 import '../../styles/login.css'
 
 async function userExists(username) {
-    return fetch(`http://localhost:3001/user/exists`, {
+    console.log(`username on client side = ${username}`)
+    return fetch("http://localhost:3001/user/exists", {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(username)
+        body: JSON.stringify({
+            'user': username
+        })
     })
     .then(data => data.json())
     .then(data => {
+        console.log(`return data on client side = ${data}`)
         if (data === true) {
             return true
         } else {
