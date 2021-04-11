@@ -128,7 +128,7 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
     function getHeader() {
         if (registering) {
             return (
-                <h2 id="register_header">Hello {username}! Looks like this is your first time here so please enter your chosen face, lock and unlock combinations below to create an account</h2>
+                <h2 id="register_header">Hello {username}! Looks like this is your first time, so please enter your chosen face, lock and unlock combinations below to create an account</h2>
             )
         } else {
             return (
@@ -156,7 +156,6 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
                     <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
                         <Form.File
                             id="lock_gesture_files"
-                            label={JSON.stringify(lockFiles)}
                             type="file"
                         >
                             <Form.File.Label>Chose at least 4 gestures as your lock gesture combination</Form.File.Label>
@@ -166,7 +165,6 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
                     <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                         <Form.File
                             id="unlock_gesture_files"
-                            label={JSON.stringify(unlockFiles)}
                             type="file"
                         >
                             <Form.File.Label>Chose another 4 gestures at least as your unlock gesture combination</Form.File.Label>
@@ -176,7 +174,7 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
                     <Button
                         type="submit"
                     >
-                        Create Account
+                        Submit
                     </Button>
                 </Form>
                 <ListGroup className="lock-group">
