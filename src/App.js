@@ -8,66 +8,49 @@ import './styles/App.css'
 
 import 'bootstrap/dist/css/bootstrap.min.css'
 import React from 'react'
-// import { BrowserRouter, Route, Switch } from 'react-router-dom'
+import { BrowserRouter, Route, Switch } from 'react-router-dom'
 
 export default function App() {
     const { username, setUsername } = UsernameToken()
     const { userExists, setUserExists } = UserExistsToken()
     const { authenticated, setAuthenticated } = AuthenticatedToken()
 
-    if(!username) {
-        return (
+    return (
+        <BrowserRouter>
             <div className="app">
                 <div className="nav-container">
                     <NavbarComponent username={username}/>
                 </div>
-                <div className="user-wrapper">
-                    <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
+                <div className="main-container">
+                    <Switch>
+                        <Route exact path="/">
+                            <UserComponent
+                                setUsername={setUsername}
+                                setUserExists={setUserExists}
+                            />
+                        </Route>
+                        <Route path="/register">
+                            <AuthenticateComponent
+                                username={username}
+                                setUserExists={setUserExists}
+                                setAuthenticated={setAuthenticated}
+                                registering={true}
+                            />
+                        </Route>
+                        <Route path="/login">
+                            <AuthenticateComponent
+                                username={username}
+                                setUserExists={setUserExists}
+                                setAuthenticated={setAuthenticated}
+                                registering={false}
+                            />
+                        </Route>
+                        <Route path="/dashboard">
+                            <DashboardComponent/>
+                        </Route>
+                    </Switch>
                 </div>
             </div>
-        )
-    } else if (!userExists) {
-        return (
-            <div className="app">
-                <div className="nav-container">
-                    <NavbarComponent username={username}/>
-                </div>
-                <div className="register-wrapper">
-                    <AuthenticateComponent
-                        username={username}
-                        setUserExists={setUserExists}
-                        setAuthenticated={setAuthenticated}
-                        registering={true}
-                    />
-                </div>
-            </div>
-        )
-    } else if (!authenticated) {
-        return (
-            <div className="app">
-                <div className="nav-container">
-                    <NavbarComponent username={username}/>
-                </div>
-                <div className="login-wrapper">
-                    <AuthenticateComponent
-                        username={username}
-                        setUserExists={setUserExists}
-                        setAuthenticated={setAuthenticated}
-                        registering={false}
-                    />
-                </div>
-            </div>
-        )
-    } else {
-        return (
-            <div className="app">
-                <div className="nav-container">
-                    <NavbarComponent username={username}/>
-                </div>
-                <div className="dashboard-wrapper">
-                    <DashboardComponent username={username}/>
-                </div>
-            </div>
-        )
-    }
+        </BrowserRouter>
+    )
 }

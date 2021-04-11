@@ -1,12 +1,19 @@
 import React from 'react'
-import PropTypes from 'prop-types';
+import Button from 'react-bootstrap'
+import PropTypes from 'prop-types'
 
-export default function UserComponent({ username }) {
+export default function DashboardComponent({ username }) {
     return (
-        <h1>Welcome {username}</h1>
+        <div className="dashboard-wrapper">
+            <h1>You are logged in {username}!</h1>
+            <Button variant="success" href="/edit/face" size="lg" block>Edit User Face</Button>
+            <Button variant="warning" href="/edit/lock" size="lg" block>Edit Lock Gesture</Button>
+            <Button variant="warning" href="/edit/unlock" size="lg" block>Edit Unlock Gesture</Button>
+            <Button variant="danger" href="/delete" size="lg" block>Delete Account</Button>
+        </div>
     )
 }
 
-UserComponent.propTypes = {
-    username: PropTypes.string.isRequired
+DashboardComponent.propTypes = {
+    username: PropTypes.string
 }

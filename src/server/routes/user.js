@@ -10,11 +10,14 @@ var S3 = new AWS.S3()
 router.use(cors())
 
 function readResponse() {
-    return JSON.parse(fs.readFileSync("response.json", "utf-8"))
+    try {
+        return JSON.parse(fs.readFileSync("response.json", "utf-8"))
+    } catch (err) {
+        return new Error("Response file not found or can't be read")
+    }
 }
 
 router.post("/exists", function(req, res, next) {
-    console.log(`return body on server side = ${req.body.user}`)
     // Connect to AWS to check if user exists
     S3.getObjectAcl({
         Bucket: process.env.FACE_RECOG_BUCKET,
@@ -28,7 +31,7 @@ router.post("/exists", function(req, res, next) {
             res.send(false)
         } else {
             // Something more serious went wrong
-            Error(err)
+            throw new Error(err.message)
         }
     })
 })
@@ -38,6 +41,7 @@ router.post("/create", function(req, res, next) {
     let logs = null
 
     // Extract gesture arrays
+    const faceFile = `${req.body.face}`
     const splitLock = Array.from(req.body.lock)
     const splitUnlock = Array.from(req.body.unlock)
 
@@ -46,10 +50,11 @@ router.post("/create", function(req, res, next) {
         `${process.env.ROOT_DIR}/src/scripts/manager.py`,
         "-m", "-a", "create",
         "-p", `${req.body.user}`,
-        "-f", `${req.body.face}`,
+        "-f", `${faceFile}`,
         "-l", `${splitLock.join(" ")}`,
         "-u", `${splitUnlock.join(" ")}`
     ])
+
     // Collect data from script, usually python's stdout that redirects to stderr for some reason
     createRequest.stderr.on('data', function (data) {
         logs += "\n" + data.toString()

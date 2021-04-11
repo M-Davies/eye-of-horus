@@ -1,0 +1,13 @@
+.lock-group {
+    position: absolute;
+    left: 0.3%;
+    width: 50%;
+    padding-right: 1%;
+}
+
+.unlock-group {
+    position: absolute;
+    right: 0.5%;
+    width: 50%;
+    padding-left: 0.5%;
+}

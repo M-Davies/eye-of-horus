@@ -3,7 +3,7 @@ import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
 import PropTypes from 'prop-types'
 
-import '../../styles/login.css'
+import '../../styles/user.css'
 
 async function userExists(username) {
     console.log(`username on client side = ${username}`)
@@ -36,7 +36,14 @@ export default function UserComponent({ setUsername, setUserExists }) {
     const handleSubmit = async e => {
         e.preventDefault()
         setUsername(username)
-        setUserExists(await userExists(username))
+        let exists = await userExists(username)
+        setUserExists(exists)
+
+        if (exists === true) {
+            window.location.href = "/login"
+        } else {
+            window.location.href = "/register"
+        }
     }
 
     return (
@@ -51,7 +58,7 @@ export default function UserComponent({ setUsername, setUserExists }) {
                         <Form.Label id="form_label">Username</Form.Label>
                         <Form.Control type="text" placeholder="Enter username" onChange={e => setName(e.target.value)}/>
                     </Form.Group>
-                    <Button variant="primary" type="submit" onClick={handleSubmit}>
+                    <Button variant="primary" type="submit">
                         Submit
                     </Button>
                 </Form>
@@ -61,6 +68,6 @@ export default function UserComponent({ setUsername, setUserExists }) {
 }
 
 UserComponent.propTypes = {
-    setUsername: PropTypes.func.isRequired,
-    setUserExists: PropTypes.func.isRequired
+    setUsername: PropTypes.func,
+    setUserExists: PropTypes.func
 }
