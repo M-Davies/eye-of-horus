@@ -18,6 +18,7 @@ function readResponse() {
 }
 
 router.post("/exists", function(req, res, next) {
+    console.log(`executed exists endpoint with username ${req.body.user}`)
     // Connect to AWS to check if user exists
     S3.getObjectAcl({
         Bucket: process.env.FACE_RECOG_BUCKET,

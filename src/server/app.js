@@ -19,7 +19,7 @@ app.set('view engine', 'jade');
 // Tooling setup
 app.use(cors());
 app.use(logger('dev', {
-  stream: fs.createWriteStream('./server.log', {flags: 'w'})
+  stream: fs.createWriteStream('./server.log', {flags: 'a'})
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
