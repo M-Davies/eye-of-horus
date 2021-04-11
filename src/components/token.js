@@ -2,8 +2,12 @@ import { useState } from 'react';
 
 export function UsernameToken() {
     const getUsername = () => {
-        const userToken = JSON.parse(localStorage.getItem('username'));
-        return userToken?.username
+        const userToken = JSON.parse(localStorage.getItem('username'))
+        if (userToken.hasOwnProperty('username')) {
+            return userToken.username
+        } else {
+            return "none"
+        }
     }
 
     const [username, setUsername] = useState(getUsername())

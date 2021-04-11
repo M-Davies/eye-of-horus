@@ -11,14 +11,60 @@ async function createUser(username, faceFile, lockFiles, unlockFiles) {
     console.log(`face file = ${JSON.stringify(faceFile)}`)
     console.log(`lock files = ${JSON.stringify(lockFiles)}`)
     console.log(`unlock files = ${JSON.stringify(unlockFiles)}`)
+
+    return fetch(`http://localhost:3001/user/create`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            user : username,
+            face : faceFile,
+            lock : lockFiles,
+            unlock : unlockFiles
+        })
+    })
+    .then(data => data.json())
+    .then(data => {
+        if (data === true) {
+            return true
+        } else {
+            return false
+        }
+    })
+    .catch((error) => {
+        console.error(error)
+    })
 }
 
-async function loginUser(username, faceFile, lockFiles, unlockFiles) {
+async function loginUser(username, faceFile, unlockFiles) {
     console.log("DEBUG")
     console.log(`username = ${username}`)
     console.log(`face file = ${JSON.stringify(faceFile)}`)
-    console.log(`lock files = ${JSON.stringify(lockFiles)}`)
     console.log(`unlock files = ${JSON.stringify(unlockFiles)}`)
+
+    return fetch(`http://localhost:3001/user/login`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            user : username,
+            face : faceFile,
+            unlock : unlockFiles
+        })
+    })
+    .then(data => data.json())
+    .then(data => {
+        if (data === true) {
+            return true
+        } else {
+            return false
+        }
+    })
+    .catch((error) => {
+        console.error(error)
+    })
 }
 
 export default function AuthenticateComponent({ username, setUserExists, setAuthenticated, registering }) {
@@ -31,7 +77,7 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
         if (registering) {
             setUserExists(await createUser(username, faceFile, lockFiles, unlockFiles))
         } else {
-            setAuthenticated(await loginUser(username, faceFile, lockFiles, unlockFiles))
+            setAuthenticated(await loginUser(username, faceFile, unlockFiles))
         }
     }
 

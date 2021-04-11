@@ -57,26 +57,4 @@ export default function App() {
             </div>
         )
     }
-    // return (
-    //     <div className="App">
-    //         <div className="main-container">
-    //             <BrowserRouter>
-    //                 <Switch>
-    //                     <Route exact path="/">
-    //                         <UserComponent setUsername={setUsername} setUserExists={setUserExists} />
-    //                     </Route>
-    //                     <Route path="/register">
-    //                         <RegisterComponent />
-    //                     </Route>
-    //                     <Route path="/login">
-    //                         <LoginComponent />
-    //                     </Route>
-    //                     <Route path="/dashboard">
-    //                         <DashboardComponent />
-    //                     </Route>
-    //                 </Switch>
-    //             </BrowserRouter>
-    //         </div>
-    //     </div>
-    // )
 }

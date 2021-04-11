@@ -28,8 +28,8 @@ AWS.config.update({region: process.env.PROFILE_REGION});
 // Route setup
 var indexRouter = require('./routes/index');
 app.use('/', indexRouter);
-var loginRouter = require("./routes/login");
-app.use('/login', loginRouter);
+var userRouter = require("./routes/user");
+app.use('/user', userRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

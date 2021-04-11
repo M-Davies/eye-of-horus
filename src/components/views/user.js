@@ -6,7 +6,7 @@ import PropTypes from 'prop-types'
 import '../../styles/login.css'
 
 async function userExists(username) {
-    return fetch(`http://localhost:3001/login/exists`, {
+    return fetch(`http://localhost:3001/user/exists`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
