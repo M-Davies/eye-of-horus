@@ -20,6 +20,7 @@ import json
 import random
 import logging
 from PIL import Image
+from dotenv import load_dotenv
 
 from face import index_photo
 from face import compare_faces
@@ -31,6 +32,7 @@ s3Client = boto3.client('s3')
 rekogClient = boto3.client('rekognition')
 logger = logging.getLogger()
 TIMEOUT_SECONDS = 20
+load_dotenv()
 
 
 def delete_file(fileName):
@@ -42,7 +44,7 @@ def delete_file(fileName):
     try:
         print("[INFO] Deleting...")
         s3Client.delete_object(
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv("FACE_RECOG_BUCKET"),
             Key=fileName
         )
     except EndpointConnectionError:
@@ -55,7 +57,7 @@ def delete_file(fileName):
     # Verify the object was deleted
     try:
         deletionRequest = s3Client.get_object_acl(
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv("FACE_RECOG_BUCKET"),
             Key=fileName
         )
     except s3Client.exceptions.NoSuchKey:
@@ -119,7 +121,7 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
         with open(fileName, "rb") as fileBytes:
             s3Client.upload_fileobj(
                 Fileobj=fileBytes,
-                Bucket=commons.FACE_RECOG_BUCKET,
+                Bucket=os.getenv("FACE_RECOG_BUCKET"),
                 Key=objectName,
                 Config=TransferConfig(
                     multipart_threshold=16777216,
@@ -200,7 +202,7 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None
     # Retrieve old configuration file
     try:
         oldFullConfig = json.loads(s3Client.get_object(
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv("FACE_RECOG_BUCKET"),
             Key=f"users/{username}/gestures/GestureConfig.json"
         )["Body"].read())
     except s3Client.exceptions.NoSuchKey:
@@ -233,7 +235,7 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None
     try:
         s3Client.put_object(
             Body=json.dumps(newGestureConfig, indent=2).encode("utf-8"),
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv("FACE_RECOG_BUCKET"),
             Key=f"users/{username}/gestures/GestureConfig.json"
         )
     except Exception as e:
@@ -430,9 +432,9 @@ def parseArgs(args):
 def main(parsedArgs=None):
     """main() : Main method that parses the input opts and returns the result"""
     # Delete old response file if it exists
-    if os.path.isfile(commons.RESPONSE_FILE_PATH):
+    if os.path.isfile(os.getenv("RESPONSE_FILE_PATH")):
         try:
-            os.remove(commons.RESPONSE_FILE_PATH)
+            os.remove(os.getenv("RESPONSE_FILE_PATH"))
         except Exception as e:
             print(f"[WARNING] Failed to delete old response json file\n{e}")
 
@@ -533,7 +535,7 @@ def main(parsedArgs=None):
             gestureConfigStr = json.dumps(gestureConfig, indent=2).encode("utf-8")
             s3Client.put_object(
                 Body=gestureConfigStr,
-                Bucket=commons.FACE_RECOG_BUCKET,
+                Bucket=os.getenv("FACE_RECOG_BUCKET"),
                 Key=f"users/{argDict.profile}/gestures/GestureConfig.json"
             )
         except Exception as e:
@@ -562,13 +564,13 @@ def main(parsedArgs=None):
         else:
             try:
                 s3Client.get_object_acl(
-                    Bucket=commons.FACE_RECOG_BUCKET,
+                    Bucket=os.getenv("FACE_RECOG_BUCKET"),
                     Key=f"users/{argDict.profile}/{argDict.profile}.jpg"
                 )
             except s3Client.exceptions.NoSuchKey:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"User {argDict.profile} does not exist or failed to retrieve configuration file",
+                    message=f"User {argDict.profile} does not exist or failed to face file",
                     code=9
                 )
         if argDict.face is None and argDict.lock is None and argDict.unlock is None:
@@ -598,11 +600,11 @@ def main(parsedArgs=None):
                 )
 
             # Delete old user image from collection
-            print(f"[INFO] Removing old face from {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}")
+            print(f"[INFO] Removing old face from {os.getenv('FACE_RECOG_COLLECTION')} for user {argDict.profile}")
             deletedFace = index_photo.remove_face_from_collection(f"{argDict.profile}.jpg")
             if deletedFace is None:
                 # This can sometimes happen if deletion was attempted before but was not completed
-                print(f"[WARNING] No face found in {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}. We will assume it has already been removed.")
+                print(f"[WARNING] No face found in {os.getenv('FACE_RECOG_COLLECTION')} for user {argDict.profile}. We will assume it has already been removed.")
             index_photo.add_face_to_collection(argDict.face)
 
             # Replace user face in S3
@@ -660,18 +662,18 @@ def main(parsedArgs=None):
             )
 
         # Remove relevant face from rekog collection
-        print(f"[INFO] Removing face from {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}")
+        print(f"[INFO] Removing face from {os.getenv('FACE_RECOG_COLLECTION')} for user {argDict.profile}")
         deletedFace = index_photo.remove_face_from_collection(f"{argDict.profile}.jpg")
         if deletedFace is None:
             # This can sometimes happen if deletion was attempted before but was not completed
-            print(f"[WARNING] No face found in {commons.FACE_RECOG_COLLECTION} for user {argDict.profile}. We will assume it has already been removed.")
+            print(f"[WARNING] No face found in {os.getenv('FACE_RECOG_COLLECTION')} for user {argDict.profile}. We will assume it has already been removed.")
 
         # Check the user's folder actually exists in s3
         print(f"[INFO] Deleting user folder for {argDict.profile} from s3...")
         s3FilePath = f"users/{argDict.profile}/{argDict.profile}.jpg"
         try:
             s3Client.get_object_acl(
-                Bucket=commons.FACE_RECOG_BUCKET,
+                Bucket=os.getenv('FACE_RECOG_BUCKET'),
                 Key=s3FilePath
             )
         except s3Client.exceptions.NoSuchKey:

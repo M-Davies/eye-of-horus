@@ -17,7 +17,7 @@ test('manager produces capturable debug', () => {
 
     // Spawn child process calling manager script, this will fail but that does not matter
     const python = spawn("python", [
-        `${ROOT_DIR}/src/scripts/manager.py`,
+        `${process.env.ROOT_DIR}/src/scripts/manager.py`,
         "-a", "edit",
         "-p", "testuser",
         "-f", "fake.jpg"

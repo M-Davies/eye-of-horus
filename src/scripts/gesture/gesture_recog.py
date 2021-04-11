@@ -36,7 +36,7 @@ def getUserCombinationFile(username):
     """
     try:
         return json.loads(s3Client.get_object(
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv('FACE_RECOG_BUCKET'),
             Key=f"users/{username}/gestures/GestureConfig.json"
         )["Body"].read())
     except s3Client.exceptions.NoSuchKey:
@@ -81,7 +81,7 @@ def getGestureTypes():
     prefixPathSplits = list(map(
         lambda jsonObject: list(filter(None, jsonObject["Prefix"].split("/"))),
         s3Client.list_objects_v2(
-            Bucket=commons.FACE_RECOG_BUCKET,
+            Bucket=os.getenv('FACE_RECOG_BUCKET'),
             Prefix="gestureTraining/",
             Delimiter="/"
         )["CommonPrefixes"]
@@ -125,7 +125,7 @@ def checkForGestures(image):
             detectedLabels = rekogClient.detect_custom_labels(
                 Image={
                     'S3Object': {
-                        'Bucket': commons.FACE_RECOG_BUCKET,
+                        'Bucket': os.getenv('FACE_RECOG_BUCKET'),
                         'Name': image,
                     }
                 },
@@ -182,7 +182,7 @@ def awaitProject(start):
         maxAttempts = 40
         timeoutSeconds = delay * maxAttempts
 
-        print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
+        print(f"[INFO] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
         waitHandler = rekogClient.get_waiter('project_version_running')
         try:
             waitHandler.wait(
@@ -195,13 +195,13 @@ def awaitProject(start):
         except WaiterError:
             return commons.respond(
                 messageType="ERROR",
-                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to start properly before {timeoutSeconds}s timeout expired. Model is likely still booting up",
+                message=f"{os.getenv('GESTURE_RECOG_PROJECT_NAME')} FAILED to start properly before {timeoutSeconds}s timeout expired. Model is likely still booting up",
                 code=15
             )
     else:
         # Stopping a model takes less time than starting one
         stopTimeout = 150
-        print(f"[INFO] Request to stop {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
+        print(f"[INFO] Request to stop {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
         time.sleep(stopTimeout)
 
 
@@ -215,10 +215,10 @@ def projectHandler(start):
 
     if start:
         # Verify that the latest rekognition model is running
-        print(f"[INFO] Checking if {commons.GESTURE_RECOG_PROJECT_NAME} has already been started...")
+        print(f"[INFO] Checking if {os.getenv('GESTURE_RECOG_PROJECT_NAME')} has already been started...")
 
         if versionDetails["Status"] == "STOPPED" or versionDetails["Status"] == "TRAINING_COMPLETED":
-            print(f"[INFO] {commons.GESTURE_RECOG_PROJECT_NAME} is not running. Starting latest model for this project (created at {versionDetails['CreationTimestamp']}) now...")
+            print(f"[INFO] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} is not running. Starting latest model for this project (created at {versionDetails['CreationTimestamp']}) now...")
 
             # Start it and wait to be in a usable state
             try:
@@ -229,13 +229,13 @@ def projectHandler(start):
             except rekogClient.exceptions.ResourceInUseException:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"Failed to start {commons.GESTURE_RECOG_PROJECT_NAME}. System is in use (e.g. starting or stopping).",
+                    message=f"Failed to start {os.getenv('GESTURE_RECOG_PROJECT_NAME')}. System is in use (e.g. starting or stopping).",
                     code=14
                 )
             except Exception as e:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"Failed to start {commons.GESTURE_RECOG_PROJECT_NAME}.",
+                    message=f"Failed to start {os.getenv('GESTURE_RECOG_PROJECT_NAME')}.",
                     content={"ERROR": str(e)},
                     code=14
                 )
@@ -246,7 +246,7 @@ def projectHandler(start):
         elif versionDetails["Status"] == "STOPPING":
             return commons.respond(
                 messageType="ERROR",
-                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is stopping. Please check again later when the process is not busy...",
+                message=f"{os.getenv('GESTURE_RECOG_PROJECT_NAME')} is stopping. Please check again later when the process is not busy...",
                 code=23
             )
         elif versionDetails["Status"] == "STARTING":
@@ -261,7 +261,7 @@ def projectHandler(start):
     # Stop the model after recog is complete
     else:
         if (versionDetails["Status"] == "RUNNING"):
-            print(f"[INFO] Stopping latest {commons.GESTURE_RECOG_PROJECT_NAME} model...")
+            print(f"[INFO] Stopping latest {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model...")
             try:
                 rekogClient.stop_project_version(
                     ProjectVersionArn=os.getenv("LATEST_MODEL_ARN")
@@ -269,7 +269,7 @@ def projectHandler(start):
             except Exception as e:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"Failed to stop the latest model of {commons.GESTURE_RECOG_PROJECT_NAME}",
+                    message=f"Failed to stop the latest model of {os.getenv('GESTURE_RECOG_PROJECT_NAME')}",
                     content={"ERROR": str(e)},
                     code=15
                 )
@@ -281,19 +281,19 @@ def projectHandler(start):
                 stoppedVersion = getProjectVersions()[0]
 
                 if stoppedVersion["Status"] == "STOPPED":
-                    print(f"[SUCCESS] {commons.GESTURE_RECOG_PROJECT_NAME} model was successfully stopped!")
+                    print(f"[SUCCESS] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model was successfully stopped!")
                     return True
                 else:
                     return commons.respond(
                         messageType="ERROR",
-                        message=f"{commons.GESTURE_RECOG_PROJECT_NAME} FAILED to stop properly before timeout expired",
+                        message=f"{os.getenv('GESTURE_RECOG_PROJECT_NAME')} FAILED to stop properly before timeout expired",
                         content={"STATUS": stoppedVersion["Status"]},
                         code=15
                     )
             else:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"{commons.GESTURE_RECOG_PROJECT_NAME} stop request was successfull but the latest model is still running.",
+                    message=f"{os.getenv('GESTURE_RECOG_PROJECT_NAME')} stop request was successfull but the latest model is still running.",
                     content={"MODEL": stoppingVersion['CreationTimestamp'], "STATUS": stoppingVersion['Status']},
                     code=1
                 )
@@ -304,11 +304,11 @@ def projectHandler(start):
         elif versionDetails["Status"] == "STOPPING":
             return commons.respond(
                 messageType="ERROR",
-                message=f"{commons.GESTURE_RECOG_PROJECT_NAME} is already stopping",
+                message=f"{os.getenv('GESTURE_RECOG_PROJECT_NAME')} is already stopping",
                 code=23
             )
         else:
-            print(f"[WARNING] {commons.GESTURE_RECOG_PROJECT_NAME} model has already stopped!")
+            print(f"[WARNING] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model has already stopped!")
             return True
 
 

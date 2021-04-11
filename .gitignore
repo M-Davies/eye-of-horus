@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 .env
+**/server.log
 
 # resources
 **/__pycache__/**

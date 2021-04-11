@@ -1,19 +1,60 @@
-import StreamButton from './components/stream.js';
-import './styles/App.css';
+import NavbarComponent from './components/views/navbar'
+import UserComponent from './components/views/user'
+import AuthenticateComponent from './components/views/authenticate'
+import DashboardComponent from './components/views/dashboard'
+import EditComponent from './components/views/edit'
+import { UsernameToken, UserExistsToken, AuthenticatedToken } from './components/token'
 
-import 'bootstrap/dist/css/bootstrap.min.css';
-import React, { Component } from 'react';
+import './styles/App.css'
 
-class App extends Component {
-  render() {
+import 'bootstrap/dist/css/bootstrap.min.css'
+import React from 'react'
+import { BrowserRouter, Route, Switch } from 'react-router-dom'
+
+export default function App() {
+    const { username, setUsername } = UsernameToken()
+    const { userExists, setUserExists } = UserExistsToken()
+    const { authenticated, setAuthenticated } = AuthenticatedToken()
+
     return (
-      <div className="App">
-        <div className="main-body">
-          <StreamButton></StreamButton>
-        </div>
-      </div>
-    );
-  }
+        <BrowserRouter>
+            <div className="app">
+                <div className="nav-container">
+                    <NavbarComponent username={username}/>
+                </div>
+                <div className="main-container">
+                    <Switch>
+                        <Route exact path="/">
+                            <UserComponent
+                                setUsername={setUsername}
+                                setUserExists={setUserExists}
+                            />
+                        </Route>
+                        <Route path="/register">
+                            <AuthenticateComponent
+                                username={username}
+                                setUserExists={setUserExists}
+                                setAuthenticated={setAuthenticated}
+                                registering={true}
+                            />
+                        </Route>
+                        <Route path="/login">
+                            <AuthenticateComponent
+                                username={username}
+                                setUserExists={setUserExists}
+                                setAuthenticated={setAuthenticated}
+                                registering={false}
+                            />
+                        </Route>
+                        <Route path="/dashboard">
+                            <DashboardComponent username={username}/>
+                        </Route>
+                        <Route path="/edit">
+                            <EditComponent username={username}/>
+                        </Route>
+                    </Switch>
+                </div>
+            </div>
+        </BrowserRouter>
+    )
 }
-
-export default App;
