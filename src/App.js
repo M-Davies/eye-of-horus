@@ -28,6 +28,7 @@ export default function App() {
                             <UserComponent
                                 setUsername={setUsername}
                                 setUserExists={setUserExists}
+                                authenticated={authenticated}
                             />
                         </Route>
                         <Route path="/register">
@@ -47,10 +48,16 @@ export default function App() {
                             />
                         </Route>
                         <Route path="/dashboard">
-                            <DashboardComponent username={username}/>
+                            <DashboardComponent
+                                username={username}
+                                authenticated={authenticated}
+                            />
                         </Route>
                         <Route path="/edit">
-                            <EditComponent username={username}/>
+                            <EditComponent
+                                username={username}
+                                authenticated={authenticated}
+                            />
                         </Route>
                     </Switch>
                 </div>

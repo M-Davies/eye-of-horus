@@ -3,70 +3,9 @@ import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import ListGroup from 'react-bootstrap/ListGroup'
 import PropTypes from 'prop-types'
+import axios from 'axios'
 
 import "../../styles/authenticate.css"
-
-async function createUser(username, faceFile, lockFiles, unlockFiles) {
-    console.log("DEBUG")
-    console.log(`username = ${username}`)
-    console.log(`face file = ${JSON.stringify(faceFile)}`)
-    console.log(`lock files = ${JSON.stringify(lockFiles)}`)
-    console.log(`unlock files = ${JSON.stringify(unlockFiles)}`)
-
-    return fetch(`http://localhost:3001/user/create`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            user : username,
-            face : faceFile,
-            lock : lockFiles,
-            unlock : unlockFiles
-        })
-    })
-    .then(data => data.json())
-    .then(data => {
-        if (data === true) {
-            return true
-        } else {
-            return false
-        }
-    })
-    .catch((error) => {
-        console.error(error)
-    })
-}
-
-async function loginUser(username, faceFile, unlockFiles) {
-    console.log("DEBUG")
-    console.log(`username = ${username}`)
-    console.log(`face file = ${JSON.stringify(faceFile)}`)
-    console.log(`unlock files = ${JSON.stringify(unlockFiles)}`)
-
-    return fetch(`http://localhost:3001/user/login`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            user : username,
-            face : faceFile,
-            unlock : unlockFiles
-        })
-    })
-    .then(data => data.json())
-    .then(data => {
-        if (data === true) {
-            return true
-        } else {
-            return false
-        }
-    })
-    .catch((error) => {
-        console.error(error)
-    })
-}
 
 export default function AuthenticateComponent({ username, setUserExists, setAuthenticated, registering }) {
     const [faceFile, setFaceFile] = useState()
@@ -79,19 +18,147 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
 
+    async function uploadFiles(files) {
+        let params = new FormData()
+
+        // Uploading 1 or more files?
+        if (Array.isArray(files)) {
+            let count = 1
+            files.forEach(file => {
+                params.append(`file_${count}`, file)
+                count++
+            })
+        } else {
+            params.append(`file`, files)
+        }
+
+        // Upload and return paths
+        return axios.post(`http://localhost:3001/upload`, params)
+            .then(res => {
+                console.log(res)
+                return Array.from(res.data)
+            })
+            .catch((error) => {
+                throw new Error(error.toString())
+            })
+    }
+
+    async function createUser() {
+        console.log("DEBUG")
+        console.log(`username`)
+        console.log(username)
+        console.log(`face file`)
+        console.log(faceFile)
+        console.log(`lock files`)
+        console.log(lockFiles)
+        console.log(`unlock files`)
+        console.log(unlockFiles)
+
+        // Upload files
+        let facePath = await uploadFiles(faceFile)
+        let lockPaths = await uploadFiles(Array.from(lockFiles))
+        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
+        console.log(facePath)
+
+        // Create user profile
+        let params = new FormData()
+        params.append("user", username)
+        params.append("face", facePath)
+        params.append("locks", lockPaths)
+        params.append("unlocks", unlockPaths)
+
+        return axios.post(`http://localhost:3001/user/create`, params)
+            .then(res => {
+                console.log(res)
+                if (res.status === 201) {
+                    return true
+                } else {
+                    return JSON.stringify(res.data)
+                }
+            })
+            .catch((error) => {
+                throw new Error(error.toString())
+            })
+    }
+
+    async function loginUser() {
+        console.log("DEBUG")
+        console.log(`username`)
+        console.log(username)
+        console.log(`face file`)
+        console.log(faceFile)
+        console.log(`unlock files`)
+        console.log(unlockFiles)
+
+        return fetch(`http://localhost:3001/user/login`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user : username,
+                face : faceFile,
+                unlock : unlockFiles
+            })
+        })
+        .then(data => data.json())
+        .then(data => {
+            // On success return bool, otherwise return the response from server
+            if (data === 200) {
+                return true
+            } else {
+                return data
+            }
+        })
+        .catch((error) => {
+            throw new Error(error.toString())
+        })
+    }
+
+    const handleLockChange = (files) => {
+        setLockFiles(files)
+        generateFileList(files, null)
+    }
+
+    const handleUnlockChange = (files) => {
+        setUnlockFiles(files)
+        generateFileList(null, files)
+    }
+
     const handleSubmit = async e => {
         e.preventDefault()
 
         if (registering) {
-            setUserExists(await createUser(username, faceFile, lockFiles, unlockFiles))
-            window.location.href = "/login"
+            // Send create request to server
+            const userCreateRes = await createUser()
+
+            // If successfull at creating user, move to login
+            if (userCreateRes === true) {
+                setUserExists(userCreateRes)
+                window.location.href = "/login"
+            } else {
+                // If unsuccessful, return to default registration with error alert
+                window.location.href = "/register"
+                alert(`${userCreateRes.messageType}\n\n${userCreateRes.message}`)
+            }
         } else {
-            setAuthenticated(await loginUser(username, faceFile, unlockFiles))
-            window.location.href = "/dashboard"
+            // Send login request to server
+            const userLoginRes = await loginUser()
+
+            // If successful at logging in user, move to dashboard
+            if (userLoginRes === true) {
+                setAuthenticated(userLoginRes)
+                window.location.href = "/dashboard"
+            } else {
+                // If unsuccessful, return to default login with error alert
+                window.location.href = "/login"
+                alert(`${userLoginRes.messageType}\n\n${userLoginRes.message}`)
+            }
         }
     }
 
-    async function generateFileList(lock=null, unlock=null) {
+    function generateFileList(lock=null, unlock=null) {
+        // Whenever files are selected by the user, update the list group to display the loaded items in order
         if (lock !== null) {
             let currentLockDisplay = []
             let lockCount = 1
@@ -115,17 +182,8 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
         }
     }
 
-    const handleLockChange = (files) => {
-        setLockFiles(files)
-        generateFileList(files, null)
-    }
-
-    const handleUnlockChange = (files) => {
-        setUnlockFiles(files)
-        generateFileList(null, files)
-    }
-
     function getHeader() {
+        // Header changes depending on whether we are registering or logging in
         if (registering) {
             return (
                 <h2 id="register_header">Hello {username}! Looks like this is your first time, so please enter your chosen face, lock and unlock combinations below to create an account</h2>
@@ -137,25 +195,14 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
         }
     }
 
-    return (
-        <div className="authenticate-wrapper">
-            {getHeader()}
-            <div className="user-forms">
-                <Form onSubmit={handleSubmit}>
-                    <Form.Group>
-                        <Form.File
-                            id="face_file"
-                            label={faceFile}
-                            onChange={(e) => setFaceFile(e.target.file)}
-                            type="file"
-                        >
-                            <Form.File.Label>Please select your face to authenticate with</Form.File.Label>
-                            <Form.File.Input />
-                        </Form.File>
-                    </Form.Group>
+    function getGestureForms() {
+        if (registering) {
+            // If this is a registration page, generate the editable forms depending on the given
+            return (
+                <div className="gesture-forms">
                     <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
                         <Form.File
-                            id="lock_gesture_files"
+                            id="lock_gesture_form"
                             type="file"
                         >
                             <Form.File.Label>Chose at least 4 gestures as your lock gesture combination</Form.File.Label>
@@ -164,23 +211,69 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
                     </Form.Group>
                     <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                         <Form.File
-                            id="unlock_gesture_files"
+                            id="unlock_gesture_form"
                             type="file"
                         >
                             <Form.File.Label>Chose another 4 gestures at least as your unlock gesture combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
                     </Form.Group>
+                </div>
+            )
+        } else {
+            // If this is a login page, generate the lock form in a disabled state
+            return (
+                <div className="gesture-forms">
+                    <fieldset disabled>
+                        <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
+                            <Form.File
+                                id="lock_gesture_form"
+                                type="file"
+                            >
+                                <Form.File.Label>You are logging in so no need for a lock gesture combination</Form.File.Label>
+                                <Form.File.Input multiple/>
+                            </Form.File>
+                        </Form.Group>
+                    </fieldset>
+                    <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
+                        <Form.File
+                            id="unlock_gesture_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Please enter your unlock combination</Form.File.Label>
+                            <Form.File.Input multiple/>
+                        </Form.File>
+                    </Form.Group>
+                </div>
+            )
+        }
+    }
+
+    return (
+        <div className="authenticate-wrapper">
+            {getHeader()}
+            <div className="user-forms">
+                <Form onSubmit={handleSubmit}>
+                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                        <Form.File
+                            id="face_file_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Please select a face to authenticate with</Form.File.Label>
+                            <Form.File.Input />
+                        </Form.File>
+                    </Form.Group>
+                    {getGestureForms()}
                     <Button
                         type="submit"
                     >
                         Submit
                     </Button>
                 </Form>
-                <ListGroup className="lock-group">
+                <ListGroup className="lock-display">
                     {lockDisplay}
                 </ListGroup>
-                <ListGroup className="unlock-group">
+                <ListGroup className="unlock-display">
                     {unlockDisplay}
                 </ListGroup>
             </div>

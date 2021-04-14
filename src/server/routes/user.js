@@ -11,9 +11,9 @@ router.use(cors())
 
 function readResponse() {
     try {
-        return JSON.parse(fs.readFileSync("response.json", "utf-8"))
+        return JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/src/scripts/response.json`, "utf-8"))
     } catch (err) {
-        return new Error("Response file not found or can't be read")
+        return false
     }
 }
 
@@ -41,22 +41,33 @@ router.post("/create", function(req, res, next) {
     let response = null
     let logs = null
 
-    // Extract gesture arrays
-    const faceFile = `${req.body.face}`
-    const splitLock = Array.from(req.body.lock)
-    const splitUnlock = Array.from(req.body.unlock)
+    console.log("BODY CONTENTS")
+    console.log(req.body)
 
     // Execute creation script with params given
     const createRequest = spawn("python", [
         `${process.env.ROOT_DIR}/src/scripts/manager.py`,
         "-m", "-a", "create",
         "-p", `${req.body.user}`,
-        "-f", `${faceFile}`,
-        "-l", `${splitLock.join(" ")}`,
-        "-u", `${splitUnlock.join(" ")}`
+        "-f", `${req.body.face}`,
+        "-l", `${(req.body.locks).replace(",", " ")}`,
+        "-u", `${(req.body.unlocks).replace(",", " ")}`
     ])
 
-    // Collect data from script, usually python's stdout that redirects to stderr for some reason
+    // On error event, something has gone wrong early so read response file if exists or exit with error
+    createRequest.on('error', function(err) {
+        console.log(`child process errored with message: ${err}`)
+        response = readResponse()
+        if (!response) {
+            res.sendStatus(500)
+        } else {
+            res.sendStatus(response.code)
+        }
+    })
+    // Collect data from script, sometimes python's stdout redirects to stderr for some reason
+    createRequest.stdout.on('data', function (data) {
+        logs += "\n" + data.toString()
+    })
     createRequest.stderr.on('data', function (data) {
         logs += "\n" + data.toString()
     })
@@ -65,9 +76,19 @@ router.post("/create", function(req, res, next) {
         console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
     })
 
-    // TODO: Parse response from the script
+    // Read response file if exists
     response = readResponse()
-    res.send(response)
+    if (!response) res.sendStatus(500)
+
+    console.log(`child process produced response file`)
+    console.log(response)
+
+    // If error was thrown by python, return the corresponding code. Otherwise, return 201 Created
+    if (response.messageType === "ERROR") {
+        res.sendStatus(response.code)
+    } else {
+        res.sendStatus(201)
+    }
 })
 
 router.post("/login", function(req, res, next) {
@@ -94,9 +115,16 @@ router.post("/login", function(req, res, next) {
         console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
     })
 
-    // TODO: Parse response from the script
+    // Read response file
     response = readResponse()
-    res.send(response)
+    console.log(`child process produced response file ${response}`)
+
+    // If error was thrown by python, return the corresponding code. Otherwise, return 200 Success
+    if (response.messageType === "ERROR") {
+        res.sendStatus(response.code)
+    } else {
+        res.sendStatus(200)
+    }
 })
 
 router.post("/logout", function(req, res, next) {

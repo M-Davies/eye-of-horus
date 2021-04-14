@@ -22,13 +22,7 @@ export function UsernameToken() {
 export function UserExistsToken() {
     const getUserExists = () => {
         const existsToken = JSON.parse(localStorage.getItem('exists'));
-        try {
-            return existsToken.exists
-        } catch (err) {
-            if (err instanceof TypeError) {
-                return false
-            }
-        }
+        return existsToken?.exists
     }
 
     const [exists, setUserExists] = useState(getUserExists())
@@ -47,13 +41,7 @@ export function UserExistsToken() {
 export function AuthenticatedToken() {
     const getAuthenticated = () => {
         const authToken = JSON.parse(localStorage.getItem('authenticated'));
-        try {
-            return authToken.authenticated
-        } catch (err) {
-            if (err instanceof TypeError) {
-                return false
-            }
-        }
+        return authToken?.authenticated
     }
 
     const [authenticated, setAuthenticated] = useState(getAuthenticated())
@@ -67,4 +55,12 @@ export function AuthenticatedToken() {
         setAuthenticated: saveAuthenticated,
         authenticated
     }
+}
+
+export function ClearToken(tokenName) {
+    localStorage.removeItem(tokenName)
+}
+
+export function ClearTokens() {
+    localStorage.clear()
 }

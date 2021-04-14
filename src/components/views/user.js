@@ -5,6 +5,8 @@ import PropTypes from 'prop-types'
 
 import '../../styles/user.css'
 
+import { ClearTokens } from '../token'
+
 async function userExists(username) {
     console.log(`username on client side = ${username}`)
     return fetch("http://localhost:3001/user/exists", {
@@ -30,11 +32,16 @@ async function userExists(username) {
     })
 }
 
-export default function UserComponent({ setUsername, setUserExists }) {
+export default function UserComponent({ setUsername, setUserExists, authenticated }) {
     const [username, setName] = useState();
 
     const handleSubmit = async e => {
         e.preventDefault()
+
+        // Before starting authentication, ensure any old tokens are deleted
+        ClearTokens()
+
+        // Check if the user exists and redirect the relevant page depending on the server result
         setUsername(username)
         let exists = await userExists(username)
         setUserExists(exists)
@@ -44,6 +51,10 @@ export default function UserComponent({ setUsername, setUserExists }) {
         } else {
             window.location.href = "/register"
         }
+    }
+
+    if (authenticated) {
+        window.location.href = "/logout"
     }
 
     return (
