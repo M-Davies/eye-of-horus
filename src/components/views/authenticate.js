@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
+import Spinner from 'react-bootstrap/Spinner'
 import ListGroup from 'react-bootstrap/ListGroup'
 import PropTypes from 'prop-types'
 import axios from 'axios'
@@ -15,6 +16,7 @@ export default function AuthenticateComponent({
     setAuthenticated,
     registering
 }) {
+    const [loading, setLoading] = useState(false)
     const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [unlockFiles, setUnlockFiles] = useState()
@@ -25,7 +27,7 @@ export default function AuthenticateComponent({
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
 
-    async function uploadFiles(files) {
+    function uploadFiles(files) {
         let params = new FormData()
 
         // Uploading 1 or more files?
@@ -42,7 +44,6 @@ export default function AuthenticateComponent({
         // Upload and return paths
         return axios.post(`http://localhost:3001/upload`, params)
             .then(res => {
-                console.log(res)
                 return Array.from(res.data)
             })
             .catch((error) => {
@@ -51,21 +52,10 @@ export default function AuthenticateComponent({
     }
 
     async function createUser() {
-        console.log("DEBUG")
-        console.log(`username`)
-        console.log(username)
-        console.log(`face file`)
-        console.log(faceFile)
-        console.log(`lock files`)
-        console.log(lockFiles)
-        console.log(`unlock files`)
-        console.log(unlockFiles)
-
         // Upload files
         let facePath = await uploadFiles(faceFile)
         let lockPaths = await uploadFiles(Array.from(lockFiles))
         let unlockPaths = await uploadFiles(Array.from(unlockFiles))
-        console.log(facePath)
 
         // Create user profile
         let params = new FormData()
@@ -76,27 +66,24 @@ export default function AuthenticateComponent({
 
         return axios.post(`http://localhost:3001/user/create`, params)
             .then(res => {
-                console.log(res)
+                setLoading(false)
                 if (res.status === 201) {
                     return true
                 } else {
                     return JSON.stringify(res.data)
                 }
             })
-            .catch((error) => {
-                throw new Error(error.toString())
+            .catch(function (error) {
+                setLoading(false)
+                if (error.response.data) {
+                    return error.response.data
+                } else {
+                    throw new Error(error.toString())
+                }
             })
     }
 
     async function loginUser() {
-        console.log("DEBUG")
-        console.log(`username`)
-        console.log(username)
-        console.log(`face file`)
-        console.log(faceFile)
-        console.log(`unlock files`)
-        console.log(unlockFiles)
-
         return fetch(`http://localhost:3001/user/login`, {
             method: 'POST',
             headers: {
@@ -134,19 +121,20 @@ export default function AuthenticateComponent({
 
     const handleSubmit = async e => {
         e.preventDefault()
+        setLoading(true)
 
         if (registering) {
             // Send create request to server
             const userCreateRes = await createUser()
 
-            // If successfull at creating user, move to login
+            // If successful at creating user, move to login
             if (userCreateRes === true) {
                 setUserExists(userCreateRes)
                 window.location.href = "/login"
             } else {
                 // If unsuccessful, return to default registration with error alert
+                alert(`${userCreateRes.TYPE}\n${userCreateRes.MESSAGE}`)
                 window.location.href = "/register"
-                alert(`${userCreateRes.messageType}\n\n${userCreateRes.message}`)
             }
         } else {
             // Send login request to server
@@ -158,8 +146,8 @@ export default function AuthenticateComponent({
                 window.location.href = "/dashboard"
             } else {
                 // If unsuccessful, return to default login with error alert
+                alert(`${userLoginRes.TYPE}\n${userLoginRes.MESSAGE}`)
                 window.location.href = "/login"
-                alert(`${userLoginRes.messageType}\n\n${userLoginRes.message}`)
             }
         }
     }
@@ -256,6 +244,28 @@ export default function AuthenticateComponent({
         }
     }
 
+    function getButton() {
+        if (loading) {
+            return (
+                <Button variant="success" type="submit" disabled>
+                    <Spinner
+                        as="span"
+                        animation="grow"
+                        role="status"
+                        aria-hidden="true"
+                    />
+                    Creating...
+                </Button>
+            )
+        } else {
+            return (
+                <Button variant="primary" type="submit">
+                    Submit
+                </Button>
+            )
+        }
+    }
+
     if (authenticated === true) {
         window.location.href = "/dashboard"
     } else if (userExists === true && window.location.pathname === "/register") {
@@ -278,11 +288,7 @@ export default function AuthenticateComponent({
                             </Form.File>
                         </Form.Group>
                         {getGestureForms()}
-                        <Button
-                            type="submit"
-                        >
-                            Submit
-                        </Button>
+                        {getButton()}
                     </Form>
                     <ListGroup className="lock-display">
                         {lockDisplay}
