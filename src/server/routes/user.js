@@ -38,21 +38,26 @@ router.post("/exists", function(req, res, next) {
 })
 
 router.post("/create", function(req, res, next) {
+    // Verify req params
+    if (!req.body.user) {
+        res.status(400).send("Invalid username supplied")
+    } else if (!req.body.face) {
+        res.status(400).send("Invalid face path supplied")
+    } else if (!req.body.locks || Object.keys(req.body.locks).length <= 0) {
+        res.status(400).send("Invalid lock paths supplied")
+    } else if (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0) {
+        res.status(400).send("Invalid unlock paths supplied")
+    }
+
     let response = null
     let logs = null
-
-    console.log("BODY CONTENTS")
-    console.log(req.body)
-
     const lockGestures = Array.from((req.body.locks).split(","))
     const unlockGestures = Array.from((req.body.unlocks).split(","))
-    console.log("GESTURES")
-    console.log(lockGestures)
-    console.log(unlockGestures)
 
     // Execute creation script with params given
     let args = [
         `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "create", "-p", `${req.body.user}`,
+        "-n", `${req.body.user}.jpg`,
         "-f", `${req.body.face}`, "-l"
     ]
     lockGestures.forEach(gesture => {
@@ -77,7 +82,6 @@ router.post("/create", function(req, res, next) {
     })
     // Collect data from script
     createRequest.stdout.on('data', function (data) {
-        console.log("stdout out")
         logs += "\n" + data.toString()
     })
     // On close event we are sure that stream from child process is closed, read response file
@@ -90,9 +94,6 @@ router.post("/create", function(req, res, next) {
             res.sendStatus(500)
         }
 
-        console.log(`child process produced response file`)
-        console.log(response)
-
         // If error was thrown by python, return the corresponding code. Otherwise, return 201 Created
         if (response.TYPE === "ERROR") {
             res.status(400).send(response)
@@ -103,39 +104,98 @@ router.post("/create", function(req, res, next) {
 })
 
 router.post("/login", function(req, res, next) {
-    let response = null
-    let logs = null
+    // Verify req params
+    if (!req.body.user) {
+        res.status(400).send("Invalid username supplied")
+    } else if (!req.body.face) {
+        res.status(400).send("Invalid face path supplied")
+    } else if (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0) {
+        res.status(400).send("Invalid unlock paths supplied")
+    }
 
-    // Extract gesture arrays & execute request
-    let loginRequest = null
-    const splitUnlock = Array.from(req.body.unlock)
-    loginRequest = spawn("python", [
-        `${process.env.ROOT_DIR}/src/scripts/manager.py`,
-        "-m", "-a", "gesture",
-        "-p", `${req.body.user}`,
-        "-f", `${req.body.face}`,
-        "-u", `${splitUnlock.join(" ")}`
-    ])
+    let faceResponse = null
+    let faceLogs = null
 
-    // Collect data from script, usually python's stdout that redirects to stderr for some reason
-    loginRequest.stderr.on('data', function (data) {
-        logs += "\n" + data.toString()
+    // Authenticate face
+    const faceArgs = [
+        `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "compare",
+        "-f", `${req.body.face}`, "-p", `${req.body.user}`
+    ]
+    const faceRequest = spawn("python", faceArgs)
+
+    // On error event, something has gone wrong early so read response file if exists or exit with error
+    faceRequest.on('error', function(err) {
+        console.log(`Face child process errored with message: ${err}`)
+        faceResponse = readResponse()
+        if (faceResponse === false) {
+            res.sendStatus(500)
+        } else {
+            res.status(400).send(faceResponse)
+        }
+    })
+    // Collect data from script
+    faceRequest.stdout.on('data', function (data) {
+        faceLogs += "\n" + data.toString()
     })
     // On close event we are sure that stream from child process is closed, read response file
-    loginRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
+    faceRequest.on('close', (code) => {
+        console.log(`Face child process close all stdio with code ${code}\nLogs collected:\n${faceLogs}`)
+
+        // Read response file if exists
+        faceResponse = readResponse()
+        if (faceResponse === false) {
+            res.status(500).send("Internal server error")
+        } else if (faceResponse.TYPE === "ERROR") {
+            // If error was thrown by python, return the corresponding code. Otherwise, check if the right face was found
+            res.status(400).send(faceResponse)
+        } else if (faceResponse.TYPE === "SUCCESS") {
+            let gestureResponse = null
+            let gestureLogs = null
+
+            // Authenticate gestures
+            const gestureArgs = [
+                `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "gesture", "-p", `${req.body.user}`, "-u"
+            ]
+            const unlockGestures = Array.from((req.body.unlocks).split(","))
+            unlockGestures.forEach(gesture => {
+                gestureArgs.push(gesture)
+            })
+            const gestureRequest = spawn("python", gestureArgs)
+
+            // On error event, something has gone wrong early so read response file if exists or exit with error
+            gestureRequest.on('error', function(err) {
+                console.log(`Gesture child process errored with message: ${err}`)
+                gestureResponse = readResponse()
+                if (gestureResponse === false) {
+                    res.sendStatus(500)
+                } else {
+                    res.status(400).send(gestureResponse)
+                }
+            })
+            // Collect data from script
+            gestureRequest.stdout.on('data', function (data) {
+                gestureLogs += "\n" + data.toString()
+            })
+            // On close event we are sure that stream from child process is closed, read response file
+            gestureRequest.on('close', (code) => {
+                console.log(`Gesture child process close all stdio with code ${code}\nLogs collected:\n${gestureLogs}`)
+                // Read response file if exists
+                gestureResponse = readResponse()
+                if (gestureResponse === false) {
+                    res.sendStatus(500)
+                }
+
+                // If error was thrown by python, return the corresponding code. Otherwise, attempt authentication with the given gestures
+                if (gestureResponse.TYPE === "ERROR") {
+                    res.status(400).send(gestureResponse)
+                } else {
+                    res.sendStatus(200)
+                }
+            })
+        } else {
+            res.status(500).send("Server error")
+        }
     })
-
-    // Read response file
-    response = readResponse()
-    console.log(`child process produced response file ${response}`)
-
-    // If error was thrown by python, return the corresponding code. Otherwise, return 200 Success
-    if (response.TYPE === "ERROR") {
-        res.status(400).send(response)
-    } else {
-        res.sendStatus(200)
-    }
 })
 
 router.post("/logout", function(req, res, next) {

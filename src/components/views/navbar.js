@@ -3,15 +3,23 @@ import Navbar from 'react-bootstrap/Navbar'
 import Nav from 'react-bootstrap/Nav'
 import PropTypes from 'prop-types'
 
-function profileText(username) {
+import '../../styles/navbar.css'
+
+function profileText(username, authenticated) {
     if (!username) {
         return (
-            <Nav.Link href="/login">Sign In</Nav.Link>
+            <Nav.Item id="nav_user">Sign In</Nav.Item>
         )
     } else {
-        return (
-            <Nav.Link href="/logout">Logged in as: {username}</Nav.Link>
-        )
+        if (authenticated === true) {
+            return (
+                <Nav.Item id="nav_user">Logged in as: {username}</Nav.Item>
+            )
+        } else {
+            return (
+                <Nav.Item id="nav_user">Logging in {username}</Nav.Item>
+            )
+        }
     }
 }
 
@@ -32,7 +40,7 @@ export default class NavbarComponent extends Component {
                     </Navbar.Brand>
                     <Navbar.Collapse className="justify-content-end">
                     <Nav className="auto">
-                        {profileText(this.props.username)}
+                        {profileText(this.props.username, this.props.authenticated)}
                     </Nav>
                     </Navbar.Collapse>
                 </Navbar>
@@ -42,9 +50,11 @@ export default class NavbarComponent extends Component {
 }
 
 NavbarComponent.propTypes = {
-    username: PropTypes.string
+    username: PropTypes.string,
+    authenticated: PropTypes.bool
 }
 
 NavbarComponent.defaultProps = {
-    username: null
+    username: null,
+    authenticated: false
 }

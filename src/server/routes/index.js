@@ -2,11 +2,8 @@ var express = require('express')
 var router = express.Router()
 var fileUpload = require('express-fileupload')
 var fs = require("fs")
-var util = require("util")
 
 router.use(fileUpload())
-
-const unlink = util.promisify(fs.unlink)
 
 /* GET home page. */
 router.get('/', function(req, res, next) {
@@ -14,6 +11,11 @@ router.get('/', function(req, res, next) {
 })
 
 router.post('/upload', function(req, res, next) {
+  // Verify req params
+  if (!req.files || Object.keys(req.files).length <= 0) {
+    res.status(400).send("No files supplied")
+  }
+
   // Iterate through files and upload one at a time
   let uploadedPaths = []
   Object.keys(req.files).forEach(fileWrapper => {

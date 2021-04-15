@@ -46,13 +46,20 @@ export default function AuthenticateComponent({
             .then(res => {
                 return Array.from(res.data)
             })
-            .catch((error) => {
-                throw new Error(error.toString())
+            .catch( function (error) {
+                try {
+                    return error.response.data
+                } catch (err) {
+                    throw new Error(error.toString())
+                }
             })
     }
 
     async function createUser() {
-        // Upload files
+        // Upload files (returning the error if something failed)
+        if (!faceFile ) { return "No face file was selected" }
+        if (!lockFiles ) { return "No lock files were selected" }
+        if (!unlockFiles) { return "No unlock files were selected" }
         let facePath = await uploadFiles(faceFile)
         let lockPaths = await uploadFiles(Array.from(lockFiles))
         let unlockPaths = await uploadFiles(Array.from(unlockFiles))
@@ -84,29 +91,34 @@ export default function AuthenticateComponent({
     }
 
     async function loginUser() {
-        return fetch(`http://localhost:3001/user/login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user : username,
-                face : faceFile,
-                unlock : unlockFiles
+        // Upload files (returning the error if something failed)
+        if (!faceFile ) { return "No face file was selected" }
+        if (!unlockFiles) { return "No unlock files were selected" }
+        let facePath = await uploadFiles(faceFile)
+        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
+
+        // Create user profile
+        let params = new FormData()
+        params.append("user", username)
+        params.append("face", facePath)
+        params.append("unlocks", unlockPaths)
+        return axios.post(`http://localhost:3001/user/login`, params)
+            .then(res => {
+                setLoading(false)
+                if (res.status === 200) {
+                    return true
+                } else {
+                    return JSON.stringify(res.data)
+                }
             })
-        })
-        .then(data => data.json())
-        .then(data => {
-            // On success return bool, otherwise return the response from server
-            if (data === 200) {
-                return true
-            } else {
-                return data
-            }
-        })
-        .catch((error) => {
-            throw new Error(error.toString())
-        })
+            .catch(function (error) {
+                setLoading(false)
+                if (error.response.data) {
+                    return error.response.data
+                } else {
+                    throw new Error(error.toString())
+                }
+            })
     }
 
     const handleLockChange = (files) => {
@@ -133,7 +145,11 @@ export default function AuthenticateComponent({
                 window.location.href = "/login"
             } else {
                 // If unsuccessful, return to default registration with error alert
-                alert(`${userCreateRes.TYPE}\n${userCreateRes.MESSAGE}`)
+                if (userCreateRes.TYPE === undefined) {
+                    alert(`${userCreateRes}`)
+                } else {
+                    alert(`${userCreateRes.TYPE}\n${userCreateRes.MESSAGE}`)
+                }
                 window.location.href = "/register"
             }
         } else {
@@ -144,9 +160,17 @@ export default function AuthenticateComponent({
             if (userLoginRes === true) {
                 setAuthenticated(true)
                 window.location.href = "/dashboard"
+            } else if (userLoginRes === false) {
+                setAuthenticated(false)
+                alert("Failed to login with given face or unlock credentials")
+                window.location.href = "/login"
             } else {
                 // If unsuccessful, return to default login with error alert
-                alert(`${userLoginRes.TYPE}\n${userLoginRes.MESSAGE}`)
+                if (userLoginRes.TYPE === undefined) {
+                    alert(`${userLoginRes}`)
+                } else {
+                    alert(`${userLoginRes.TYPE}\n${userLoginRes.MESSAGE}`)
+                }
                 window.location.href = "/login"
             }
         }
@@ -254,7 +278,7 @@ export default function AuthenticateComponent({
                         role="status"
                         aria-hidden="true"
                     />
-                    Creating...
+                    Working...
                 </Button>
             )
         } else {
