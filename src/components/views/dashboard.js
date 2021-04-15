@@ -2,7 +2,13 @@ import React from 'react'
 import Button from 'react-bootstrap/Button'
 import PropTypes from 'prop-types'
 
-export default function DashboardComponent({ username }) {
+export default function DashboardComponent({ username, authenticated }) {
+
+    if (!authenticated) {
+        window.location.href = "/"
+        alert("You need to be logged in to view this page")
+    }
+
     return (
         <div className="dashboard-wrapper">
             <h1>You are logged in as {username}!</h1>

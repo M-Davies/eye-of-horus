@@ -1,11 +1,11 @@
-.lock-group {
+.lock-display {
     position: absolute;
     left: 0.3%;
     width: 50%;
     padding-right: 1%;
 }
 
-.unlock-group {
+.unlock-display {
     position: absolute;
     right: 0.5%;
     width: 50%;

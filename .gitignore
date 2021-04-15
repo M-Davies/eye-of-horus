@@ -20,6 +20,7 @@ testing/personalNotes.md
 /build
 **/node_modules/**
 **/response.json
+src/server/public/*
 
 # misc
 .DS_Store
