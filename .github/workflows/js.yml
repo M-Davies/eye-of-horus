@@ -17,6 +17,6 @@ jobs:
         node-version: '12.x'
     - name: Install
       run: npm install
-    - name: Test
-      run: |
-        npm run jstest
+    # - name: Test
+    #   run: |
+    #     npm run jstest
