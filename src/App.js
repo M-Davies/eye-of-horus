@@ -34,7 +34,9 @@ export default function App() {
                         <Route path="/register">
                             <AuthenticateComponent
                                 username={username}
+                                userExists={userExists}
                                 setUserExists={setUserExists}
+                                authenticated={authenticated}
                                 setAuthenticated={setAuthenticated}
                                 registering={true}
                             />
@@ -42,7 +44,9 @@ export default function App() {
                         <Route path="/login">
                             <AuthenticateComponent
                                 username={username}
+                                userExists={userExists}
                                 setUserExists={setUserExists}
+                                authenticated={authenticated}
                                 setAuthenticated={setAuthenticated}
                                 registering={false}
                             />
