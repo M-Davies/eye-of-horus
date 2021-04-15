@@ -11,14 +11,14 @@ router.use(cors())
 
 function readResponse() {
     try {
-        return JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/src/scripts/response.json`, "utf-8"))
+        return JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/src/scripts/response.json`))
     } catch (err) {
         return false
     }
 }
 
 router.post("/exists", function(req, res, next) {
-    console.log(`executed exists endpoint with username ${req.body.user}`)
+    console.log(`Executed exists endpoint with username ${req.body.user}`)
     // Connect to AWS to check if user exists
     S3.getObjectAcl({
         Bucket: process.env.FACE_RECOG_BUCKET,
@@ -26,13 +26,13 @@ router.post("/exists", function(req, res, next) {
     }, function(err, data) {
         if (data && !err) {
             // User exists
-            res.send(true)
+            res.status(200).send(true)
         } else if (err.statusCode === 404) {
             // User doesn't exist
-            res.send(false)
+            res.status(200).send(false)
         } else {
             // Something more serious went wrong
-            throw new Error(err.message)
+            res.status(500).send(err.message)
         }
     })
 })
@@ -44,51 +44,62 @@ router.post("/create", function(req, res, next) {
     console.log("BODY CONTENTS")
     console.log(req.body)
 
+    const lockGestures = Array.from((req.body.locks).split(","))
+    const unlockGestures = Array.from((req.body.unlocks).split(","))
+    console.log("GESTURES")
+    console.log(lockGestures)
+    console.log(unlockGestures)
+
     // Execute creation script with params given
-    const createRequest = spawn("python", [
-        `${process.env.ROOT_DIR}/src/scripts/manager.py`,
-        "-m", "-a", "create",
-        "-p", `${req.body.user}`,
-        "-f", `${req.body.face}`,
-        "-l", `${(req.body.locks).replace(",", " ")}`,
-        "-u", `${(req.body.unlocks).replace(",", " ")}`
-    ])
+    let args = [
+        `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "create", "-p", `${req.body.user}`,
+        "-f", `${req.body.face}`, "-l"
+    ]
+    lockGestures.forEach(gesture => {
+        args.push(gesture)
+    })
+    args.push("-u")
+    unlockGestures.forEach(gesture => {
+        args.push(gesture)
+    })
+
+    const createRequest = spawn("python", args)
 
     // On error event, something has gone wrong early so read response file if exists or exit with error
     createRequest.on('error', function(err) {
         console.log(`child process errored with message: ${err}`)
         response = readResponse()
-        if (!response) {
+        if (response === false) {
             res.sendStatus(500)
         } else {
-            res.sendStatus(response.code)
+            res.status(400).send(response)
         }
     })
-    // Collect data from script, sometimes python's stdout redirects to stderr for some reason
+    // Collect data from script
     createRequest.stdout.on('data', function (data) {
-        logs += "\n" + data.toString()
-    })
-    createRequest.stderr.on('data', function (data) {
+        console.log("stdout out")
         logs += "\n" + data.toString()
     })
     // On close event we are sure that stream from child process is closed, read response file
     createRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
+        console.log(`Child process close all stdio with code ${code}\nLogs collected:\n${logs}`)
+
+        // Read response file if exists
+        response = readResponse()
+        if (response === false) {
+            res.sendStatus(500)
+        }
+
+        console.log(`child process produced response file`)
+        console.log(response)
+
+        // If error was thrown by python, return the corresponding code. Otherwise, return 201 Created
+        if (response.TYPE === "ERROR") {
+            res.status(400).send(response)
+        } else {
+            res.sendStatus(201)
+        }
     })
-
-    // Read response file if exists
-    response = readResponse()
-    if (!response) res.sendStatus(500)
-
-    console.log(`child process produced response file`)
-    console.log(response)
-
-    // If error was thrown by python, return the corresponding code. Otherwise, return 201 Created
-    if (response.messageType === "ERROR") {
-        res.sendStatus(response.code)
-    } else {
-        res.sendStatus(201)
-    }
 })
 
 router.post("/login", function(req, res, next) {
@@ -120,8 +131,8 @@ router.post("/login", function(req, res, next) {
     console.log(`child process produced response file ${response}`)
 
     // If error was thrown by python, return the corresponding code. Otherwise, return 200 Success
-    if (response.messageType === "ERROR") {
-        res.sendStatus(response.code)
+    if (response.TYPE === "ERROR") {
+        res.status(400).send(response)
     } else {
         res.sendStatus(200)
     }

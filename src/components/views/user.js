@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import Button from 'react-bootstrap/Button'
 import Form from 'react-bootstrap/Form'
+import Spinner from 'react-bootstrap/Spinner'
 import PropTypes from 'prop-types'
 
 import '../../styles/user.css'
@@ -8,7 +9,6 @@ import '../../styles/user.css'
 import { ClearTokens } from '../token'
 
 async function userExists(username) {
-    console.log(`username on client side = ${username}`)
     return fetch("http://localhost:3001/user/exists", {
         method: 'POST',
         headers: {
@@ -20,20 +20,20 @@ async function userExists(username) {
     })
     .then(data => data.json())
     .then(data => {
-        console.log(`return data on client side = ${data}`)
         if (data === true) {
             return true
         } else {
             return false
         }
     })
-    .catch((error) => {
-        console.error(error)
+    .catch(function (error) {
+        return error.response.data
     })
 }
 
 export default function UserComponent({ setUsername, setUserExists, authenticated }) {
-    const [username, setName] = useState();
+    const [username, setName] = useState()
+    const [loading, setLoading] = useState(false)
 
     const handleSubmit = async e => {
         e.preventDefault()
@@ -43,13 +43,41 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
 
         // Check if the user exists and redirect the relevant page depending on the server result
         setUsername(username)
+        setLoading(true)
         let exists = await userExists(username)
+        if (!userExists instanceof Boolean) {
+            alert(`SERVER ERROR\n${exists}`)
+            window.location.href = "/"
+        }
+        setLoading(false)
         setUserExists(exists)
 
         if (exists === true) {
             window.location.href = "/login"
         } else {
             window.location.href = "/register"
+        }
+    }
+
+    function getButton() {
+        if (loading) {
+            return (
+                <Button variant="success" type="submit" disabled>
+                    <Spinner
+                        as="span"
+                        animation="grow"
+                        role="status"
+                        aria-hidden="true"
+                    />
+                    Loading...
+                </Button>
+            )
+        } else {
+            return (
+                <Button variant="primary" type="submit">
+                    Submit
+                </Button>
+            )
         }
     }
 
@@ -69,9 +97,7 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
                         <Form.Label id="form_label">Username</Form.Label>
                         <Form.Control type="text" placeholder="Enter username" onChange={e => setName(e.target.value)}/>
                     </Form.Group>
-                    <Button variant="primary" type="submit">
-                        Submit
-                    </Button>
+                    {getButton()}
                 </Form>
             </div>
         </div>
