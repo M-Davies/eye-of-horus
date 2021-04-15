@@ -15,12 +15,29 @@ from dotenv import load_dotenv
 load_dotenv()
 
 sys.path.append(os.path.dirname(__file__) + "/..")
-import commons  # noqa: E402
+import commons  # noqa: E402,F401
 import time  # noqa: E402
 
 rekog = boto3.client("rekognition")
 kinesis = boto3.client("kinesis")
 knVideo = boto3.client("kinesisvideo")
+
+
+def compareFaces(localImage, username):
+    with open(localImage, "rb") as fileBytes:
+        return rekog.compare_faces(
+            SourceImage={
+                'Bytes': fileBytes.read(),
+            },
+            TargetImage={
+                'S3Object': {
+                    'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                    'Name': f"users/{username}/{username}.jpg"
+                }
+            },
+            SimilarityThreshold=90,
+            QualityFilter='AUTO'
+        )
 
 
 def examineFace(record):

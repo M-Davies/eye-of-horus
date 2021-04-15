@@ -14,7 +14,7 @@ These scripts can be used with the accompanying website OR on their own via the 
 7. File Is Of An Incompatible Type
 8. File Does Not Exist Locally
 9. File Does Not Exist In S3
-10. Stream Timeout Was Fired
+10. Stream Timeout Was Fired or face found did not match
 11. Stream Wasn't Found
 12. Stream Was Interrupted
 13. Invalid Action Type

@@ -20,7 +20,7 @@ export default function App() {
         <BrowserRouter>
             <div className="app">
                 <div className="nav-container">
-                    <NavbarComponent username={username}/>
+                    <NavbarComponent username={username} authenticated={authenticated}/>
                 </div>
                 <div className="main-container">
                     <Switch>

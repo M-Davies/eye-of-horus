@@ -367,6 +367,7 @@ def parseArgs(args):
     :param args: Array of sys.argv to parse
     :return: A dictionary of args by name
     """
+    global TIMEOUT_SECONDS
     argumentParser = argparse.ArgumentParser(
         description="Welcome to the eye of horus facial and gesture recognition authentication system! Please see the command options below for the usage of this tool outside of a website environment.",
         formatter_class=argparse.RawTextHelpFormatter
@@ -376,7 +377,7 @@ def parseArgs(args):
         "-a", "--action",
         required=True,
         choices=["create", "edit", "delete", "compare", "gesture"],
-        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\nedit: Edits a user --profile account's --face, --lock or --unlock feature. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout\n\ngesture: Takes a number of --lock OR --unlock images as input for authenticating with the gesture recognition client against the user --profile.
+        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\nedit: Edits a user --profile account's --face, --lock or --unlock feature. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout. Alternatively, you can specify a --face to compare against a --user's.\n\ngesture: Takes a number of --lock OR --unlock images as input for authenticating with the gesture recognition client against the user --profile.
         """
     )
     argumentParser.add_argument(
@@ -431,6 +432,7 @@ def parseArgs(args):
 #########
 def main(parsedArgs=None):
     """main() : Main method that parses the input opts and returns the result"""
+    global TIMEOUT_SECONDS
     # Delete old response file if it exists
     if os.path.isfile(os.getenv("RESPONSE_FILE_PATH")):
         try:
@@ -695,39 +697,80 @@ def main(parsedArgs=None):
 
     # Run face comparison on stream
     elif argDict.action == "compare":
-        if argDict.timeout is not None:
-            TIMEOUT_SECONDS = argDict.timeout
+        if argDict.face is not None:
+            # Verify params
+            if argDict.profile is None or "":
+                return commons.respond(
+                    messageType="ERROR",
+                    message="-p was not specified. Please pass in a user account name",
+                    code=13
+                )
 
-        print(f"[INFO] Running facial comparison library to check for user faces in current stream (timing out after {TIMEOUT_SECONDS}s)...")
+            if os.path.isfile(argDict.face):
+                try:
+                    Image.open(argDict.face)
+                except IOError:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"File {argDict.face} exists but is not an image. Only jpg and png files are valid",
+                        code=7
+                    )
+            else:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"Could not find file {argDict.face}",
+                    code=8
+                )
 
-        # Start/end stream
-        streamHandler(True, 3)
+            # Run face comparison
+            print(f"[INFO] Running facial comparison library to compare {argDict.face} against the stored face for {argDict.profile}")
+            faceCompare = compare_faces.compareFaces(argDict.face, argDict.profile)
+            if faceCompare["FaceMatches"] is not [] and len(faceCompare["FaceMatches"]) == 1:
+                return commons.respond(
+                    messageType="SUCCESS",
+                    message=f"Input face {argDict.face} matched successfully with stored user's {argDict.profile} face",
+                    code=0
+                )
+            else:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"Input face {argDict.face} does not match stored user's {argDict.profile} face",
+                    code=10
+                )
+        else:
+            if argDict.timeout is not None:
+                TIMEOUT_SECONDS = argDict.timeout
 
-        # Start comparing, timing out if no face is found within the limit
-        try:
-            signal.signal(signal.SIGALRM, timeoutHandler)
-            signal.alarm(TIMEOUT_SECONDS)
-            matchedFace = compare_faces.checkForFaces()
+            print(f"[INFO] Running facial comparison library to check for user faces in current stream (timing out after {TIMEOUT_SECONDS}s)...")
 
-            # By this point, we have found a face so cancel the timeout and return the matched face
-            signal.alarm(0)
-            return commons.respond(
-                messageType="SUCCESS",
-                message="Found a matching face!",
-                content=matchedFace,
-                code=0
-            )
-        except TimeoutError:
-            signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            return commons.respond(
-                messageType="ERROR",
-                message=f"TIMEOUT FIRED AFTER {TIMEOUT_SECONDS}s, NO FACES WERE FOUND IN THE STREAM!",
-                code=10
-            )
-        finally:
-            # Reset signal handler everytime
-            signal.signal(signal.SIGALRM, signal.SIG_DFL)
-            streamHandler(False)
+            # Start/end stream
+            streamHandler(True, 3)
+
+            # Start comparing, timing out if no face is found within the limit
+            try:
+                signal.signal(signal.SIGALRM, timeoutHandler)
+                signal.alarm(TIMEOUT_SECONDS)
+                matchedFace = compare_faces.checkForFaces()
+
+                # By this point, we have found a face so cancel the timeout and return the matched face
+                signal.alarm(0)
+                return commons.respond(
+                    messageType="SUCCESS",
+                    message="Found a matching face!",
+                    content=matchedFace,
+                    code=0
+                )
+            except TimeoutError:
+                signal.signal(signal.SIGALRM, signal.SIG_DFL)
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"TIMEOUT FIRED AFTER {TIMEOUT_SECONDS}s, NO FACES WERE FOUND IN THE STREAM!",
+                    code=10
+                )
+            finally:
+                # Reset signal handler everytime
+                signal.signal(signal.SIGALRM, signal.SIG_DFL)
+                streamHandler(False)
 
     # Run gesture recognition against given images
     elif argDict.action == "gesture":
