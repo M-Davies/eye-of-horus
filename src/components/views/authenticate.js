@@ -7,7 +7,14 @@ import axios from 'axios'
 
 import "../../styles/authenticate.css"
 
-export default function AuthenticateComponent({ username, setUserExists, setAuthenticated, registering }) {
+export default function AuthenticateComponent({
+    username,
+    userExists,
+    setUserExists,
+    authenticated,
+    setAuthenticated,
+    registering
+}) {
     const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [unlockFiles, setUnlockFiles] = useState()
@@ -147,7 +154,7 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
 
             // If successful at logging in user, move to dashboard
             if (userLoginRes === true) {
-                setAuthenticated(userLoginRes)
+                setAuthenticated(true)
                 window.location.href = "/dashboard"
             } else {
                 // If unsuccessful, return to default login with error alert
@@ -249,36 +256,44 @@ export default function AuthenticateComponent({ username, setUserExists, setAuth
         }
     }
 
-    return (
-        <div className="authenticate-wrapper">
-            {getHeader()}
-            <div className="user-forms">
-                <Form onSubmit={handleSubmit}>
-                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                        <Form.File
-                            id="face_file_form"
-                            type="file"
+    if (authenticated === true) {
+        window.location.href = "/dashboard"
+    } else if (userExists === true && window.location.pathname === "/register") {
+        window.location.href = "/login"
+    } else if (userExists === false && window.location.pathname === "/login") {
+        window.location.href = "/register"
+    } else {
+        return (
+            <div className="authenticate-wrapper">
+                {getHeader()}
+                <div className="user-forms">
+                    <Form onSubmit={handleSubmit}>
+                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                            <Form.File
+                                id="face_file_form"
+                                type="file"
+                            >
+                                <Form.File.Label>Please select a face to authenticate with</Form.File.Label>
+                                <Form.File.Input />
+                            </Form.File>
+                        </Form.Group>
+                        {getGestureForms()}
+                        <Button
+                            type="submit"
                         >
-                            <Form.File.Label>Please select a face to authenticate with</Form.File.Label>
-                            <Form.File.Input />
-                        </Form.File>
-                    </Form.Group>
-                    {getGestureForms()}
-                    <Button
-                        type="submit"
-                    >
-                        Submit
-                    </Button>
-                </Form>
-                <ListGroup className="lock-display">
-                    {lockDisplay}
-                </ListGroup>
-                <ListGroup className="unlock-display">
-                    {unlockDisplay}
-                </ListGroup>
+                            Submit
+                        </Button>
+                    </Form>
+                    <ListGroup className="lock-display">
+                        {lockDisplay}
+                    </ListGroup>
+                    <ListGroup className="unlock-display">
+                        {unlockDisplay}
+                    </ListGroup>
+                </div>
             </div>
-        </div>
-    )
+        )
+    }
 }
 
 AuthenticateComponent.propTypes = {

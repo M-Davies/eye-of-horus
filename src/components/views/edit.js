@@ -5,14 +5,13 @@ export default function EditComponent({ username, authenticated }) {
 
     if (!authenticated) {
         window.location.href = "/"
-        alert("You need to be logged in to view this page")
+    } else {
+        return (
+            <div className="edit-wrapper">
+                <h1>Edit Page</h1>
+            </div>
+        )
     }
-
-    return (
-        <div className="dashboard-wrapper">
-            <h1>Edit Page</h1>
-        </div>
-    )
 }
 
 EditComponent.propTypes = {
