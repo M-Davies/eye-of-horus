@@ -138,7 +138,6 @@ export default function EditComponent({ username, authenticated }) {
 
         // If successful at creating user, move to login
         if (editRes === true) {
-            alert("Edit successful")
             window.location.href = "/dashboard"
         } else {
             // If unsuccessful, return to default registration with error alert
