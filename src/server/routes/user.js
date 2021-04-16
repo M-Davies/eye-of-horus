@@ -110,7 +110,7 @@ router.post("/auth", function(req, res, next) {
     } else if (!req.body.face) {
         res.status(400).send("No face path supplied")
     } else if ((!req.body.locks || Object.keys(req.body.locks).length <= 0) && (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0)) {
-        res.status(400).send("No gesturepaths supplied")
+        res.status(400).send("No gesture paths supplied")
     }
 
     let faceResponse = null
