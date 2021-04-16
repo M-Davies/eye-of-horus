@@ -27,7 +27,11 @@ async function userExists(username) {
         }
     })
     .catch(function (error) {
-        return error.response.data
+        try {
+            return error.response.data
+        } catch (err) {
+            throw new Error(error.toString())
+        }
     })
 }
 
@@ -82,7 +86,7 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
     }
 
     if (authenticated) {
-        window.location.href = "/logout"
+        window.location.href = "/dashboard"
     }
 
     return (
@@ -106,5 +110,6 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
 
 UserComponent.propTypes = {
     setUsername: PropTypes.func,
-    setUserExists: PropTypes.func
+    setUserExists: PropTypes.func,
+    authenticated: PropTypes.bool
 }

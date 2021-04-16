@@ -8,7 +8,7 @@ import '../../styles/navbar.css'
 function profileText(username, authenticated) {
     if (!username) {
         return (
-            <Nav.Item id="nav_user">Sign In</Nav.Item>
+            <Nav.Item id="nav_user">Not Signed In</Nav.Item>
         )
     } else {
         if (authenticated === true) {

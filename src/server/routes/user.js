@@ -103,14 +103,14 @@ router.post("/create", function(req, res, next) {
     })
 })
 
-router.post("/login", function(req, res, next) {
+router.post("/auth", function(req, res, next) {
     // Verify req params
     if (!req.body.user) {
-        res.status(400).send("Invalid username supplied")
+        res.status(400).send("No username supplied")
     } else if (!req.body.face) {
-        res.status(400).send("Invalid face path supplied")
-    } else if (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0) {
-        res.status(400).send("Invalid unlock paths supplied")
+        res.status(400).send("No face path supplied")
+    } else if ((!req.body.locks || Object.keys(req.body.locks).length <= 0) && (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0)) {
+        res.status(400).send("No gesture paths supplied")
     }
 
     let faceResponse = null
@@ -139,6 +139,7 @@ router.post("/login", function(req, res, next) {
     })
     // On close event we are sure that stream from child process is closed, read response file
     faceRequest.on('close', (code) => {
+        const badCreds = `Incorrect face or gesture combination given for ${req.body.user}`
         console.log(`Face child process close all stdio with code ${code}\nLogs collected:\n${faceLogs}`)
 
         // Read response file if exists
@@ -146,20 +147,26 @@ router.post("/login", function(req, res, next) {
         if (faceResponse === false) {
             res.status(500).send("Internal server error")
         } else if (faceResponse.TYPE === "ERROR") {
-            // If error was thrown by python, return the corresponding code. Otherwise, check if the right face was found
-            res.status(400).send(faceResponse)
+            // If error was thrown by python (usually if the faces don't match), return the corresponding code.
+            res.status(400).send(badCreds)
         } else if (faceResponse.TYPE === "SUCCESS") {
             let gestureResponse = null
             let gestureLogs = null
 
             // Authenticate gestures
-            const gestureArgs = [
-                `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "gesture", "-p", `${req.body.user}`, "-u"
-            ]
-            const unlockGestures = Array.from((req.body.unlocks).split(","))
-            unlockGestures.forEach(gesture => {
-                gestureArgs.push(gesture)
-            })
+            let gestureArgs = [`${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "gesture", "-p", `${req.body.user}`]
+
+            if (req.body.locks) {
+                gestureArgs.push("-l")
+                Array.from((req.body.locks).split(",")).forEach(gesture => {
+                    gestureArgs.push(gesture)
+                })
+            } else {
+                gestureArgs.push("-u")
+                Array.from((req.body.unlocks).split(",")).forEach(gesture => {
+                    gestureArgs.push(gesture)
+                })
+            }
             const gestureRequest = spawn("python", gestureArgs)
 
             // On error event, something has gone wrong early so read response file if exists or exit with error
@@ -185,9 +192,9 @@ router.post("/login", function(req, res, next) {
                     res.sendStatus(500)
                 }
 
-                // If error was thrown by python, return the corresponding code. Otherwise, attempt authentication with the given gestures
+                // If error was thrown by python (usually if the gesture combination is wrong), return the corresponding code.
                 if (gestureResponse.TYPE === "ERROR") {
-                    res.status(400).send(gestureResponse)
+                    res.status(400).send(badCreds)
                 } else {
                     res.sendStatus(200)
                 }
@@ -198,33 +205,120 @@ router.post("/login", function(req, res, next) {
     })
 })
 
-router.post("/logout", function(req, res, next) {
+router.post("/edit", function(req, res, next) {
     let response = null
     let logs = null
 
-    // Extract gesture arrays & execute request
-    let logoutRequest = null
-    const splitLock = Array.from(req.body.lock)
-    logoutRequest = spawn("python", [
-        `${process.env.ROOT_DIR}/src/scripts/manager.py`,
-        "-m", "-a", "gesture",
-        "-p", `${req.body.user}`,
-        "-f", `${req.body.face}`,
-        "-l", `${splitLock.join(" ")}`
-    ])
+    // Verify req params
+    let lockNoFiles = null
+    let unlockNoFiles = null
+    try {
+        lockNoFiles = Object.keys(req.body.locks).length <= 0
+    } catch (err) {
+        lockNoFiles = true
+    }
+    try {
+        unlockNoFiles = Object.keys(req.body.unlocks).length <= 0
+    } catch (err) {
+        unlockNoFiles = true
+    }
 
-    // Collect data from script, usually python's stdout that redirects to stderr for some reason
-    logoutRequest.stderr.on('data', function (data) {
+    if (!req.body.user) {
+        res.status(400).send("No username supplied")
+    } else if (!req.body.face && lockNoFiles && unlockNoFiles) {
+        res.status(400).send("No editable objects supplied")
+    }
+
+    let args = [
+        `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "edit", "-p", `${req.body.user}`,
+        "-n", `${req.body.user}.jpg`
+    ]
+    if (req.body.face) {
+        args.push("-f")
+        args.push(req.body.face)
+    }
+    if (!lockNoFiles) {
+        args.push("-l")
+        Array.from((req.body.locks).split(",")).forEach(gesture => {
+            args.push(gesture)
+        })
+    }
+    if (!unlockNoFiles) {
+        args.push("-u")
+        Array.from((req.body.unlocks).split(",")).forEach(gesture => {
+            args.push(gesture)
+        })
+    }
+    const request = spawn("python", args)
+
+    request.on('error', function(err) {
+        console.log(`Edit child process errored with message: ${err}`)
+        response = readResponse()
+        if (response === false) {
+            res.sendStatus(500)
+        } else {
+            res.status(400).send(response)
+        }
+    })
+
+    request.stdout.on('data', function (data) {
         logs += "\n" + data.toString()
     })
-    // On close event we are sure that stream from child process is closed, read response file
-    logoutRequest.on('close', (code) => {
-        console.log(`child process close all stdio with code ${code}\nlogs collected:\n${logs}`)
+
+    request.on('close', (code) => {
+        console.log(`Edit child process close all stdio with code ${code}\nLogs collected:\n${logs}`)
+        response = readResponse()
+        if (response === false) {
+            res.sendStatus(500)
+        }
+
+        if (response.TYPE === "ERROR") {
+            res.status(400).send(response)
+        } else {
+            res.sendStatus(201)
+        }
+    })
+})
+
+router.post("/delete", function(req, res, next) {
+    let response = null
+    let logs = null
+
+    // Verify req params
+    if (!req.body.user) {
+        res.status(400).send("No username supplied")
+    }
+
+    let args = [`${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "delete", "-p", `${req.body.user}`]
+    const request = spawn("python", args)
+
+    request.on('error', function(err) {
+        console.log(`Delete child process errored with message: ${err}`)
+        response = readResponse()
+        if (response === false) {
+            res.sendStatus(500)
+        } else {
+            res.status(400).send(response)
+        }
     })
 
-    // TODO: Parse response from the script
-    response = readResponse()
-    res.send(response)
+    request.stdout.on('data', function (data) {
+        logs += "\n" + data.toString()
+    })
+
+    request.on('close', (code) => {
+        console.log(`Delete child process close all stdio with code ${code}\nLogs collected:\n${logs}`)
+        response = readResponse()
+        if (response === false) {
+            res.sendStatus(500)
+        }
+
+        if (response.TYPE === "ERROR") {
+            res.status(400).send(response)
+        } else {
+            res.sendStatus(200)
+        }
+    })
 })
 
 module.exports = router;

@@ -6,6 +6,8 @@ import ListGroup from 'react-bootstrap/ListGroup'
 import PropTypes from 'prop-types'
 import axios from 'axios'
 
+import { uploadFiles } from '../middleware'
+
 import "../../styles/authenticate.css"
 
 export default function AuthenticateComponent({
@@ -27,34 +29,6 @@ export default function AuthenticateComponent({
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
 
-    function uploadFiles(files) {
-        let params = new FormData()
-
-        // Uploading 1 or more files?
-        if (Array.isArray(files)) {
-            let count = 1
-            files.forEach(file => {
-                params.append(`file_${count}`, file)
-                count++
-            })
-        } else {
-            params.append(`file`, files)
-        }
-
-        // Upload and return paths
-        return axios.post(`http://localhost:3001/upload`, params)
-            .then(res => {
-                return Array.from(res.data)
-            })
-            .catch( function (error) {
-                try {
-                    return error.response.data
-                } catch (err) {
-                    throw new Error(error.toString())
-                }
-            })
-    }
-
     async function createUser() {
         // Upload files (returning the error if something failed)
         if (!faceFile ) { return "No face file was selected" }
@@ -71,7 +45,7 @@ export default function AuthenticateComponent({
         params.append("locks", lockPaths)
         params.append("unlocks", unlockPaths)
 
-        return axios.post(`http://localhost:3001/user/create`, params)
+        return axios.post("http://localhost:3001/user/create", params)
             .then(res => {
                 setLoading(false)
                 if (res.status === 201) {
@@ -102,7 +76,7 @@ export default function AuthenticateComponent({
         params.append("user", username)
         params.append("face", facePath)
         params.append("unlocks", unlockPaths)
-        return axios.post(`http://localhost:3001/user/login`, params)
+        return axios.post("http://localhost:3001/user/auth", params)
             .then(res => {
                 setLoading(false)
                 if (res.status === 200) {
@@ -142,7 +116,8 @@ export default function AuthenticateComponent({
             // If successful at creating user, move to login
             if (userCreateRes === true) {
                 setUserExists(userCreateRes)
-                window.location.href = "/login"
+                setAuthenticated(true)
+                window.location.href = "/dashboard"
             } else {
                 // If unsuccessful, return to default registration with error alert
                 if (userCreateRes.TYPE === undefined) {
@@ -160,7 +135,7 @@ export default function AuthenticateComponent({
             if (userLoginRes === true) {
                 setAuthenticated(true)
                 window.location.href = "/dashboard"
-            } else if (userLoginRes === false) {
+            } else if (userLoginRes.CODE === 10) {
                 setAuthenticated(false)
                 alert("Failed to login with given face or unlock credentials")
                 window.location.href = "/login"
@@ -233,7 +208,7 @@ export default function AuthenticateComponent({
                             id="unlock_gesture_form"
                             type="file"
                         >
-                            <Form.File.Label>Chose another 4 gestures at least as your unlock gesture combination</Form.File.Label>
+                            <Form.File.Label>Chose at least 4 other gestures as your unlock gesture combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
                     </Form.Group>
@@ -301,13 +276,14 @@ export default function AuthenticateComponent({
             <div className="authenticate-wrapper">
                 {getHeader()}
                 <div className="user-forms">
+                    <Button variant="secondary" href="/">Back</Button>
                     <Form onSubmit={handleSubmit}>
                         <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
                             <Form.File
                                 id="face_file_form"
                                 type="file"
                             >
-                                <Form.File.Label>Please select a face to authenticate with</Form.File.Label>
+                                <Form.File.Label>Face File</Form.File.Label>
                                 <Form.File.Input />
                             </Form.File>
                         </Form.Group>
@@ -328,7 +304,9 @@ export default function AuthenticateComponent({
 
 AuthenticateComponent.propTypes = {
     username: PropTypes.string,
+    userExists: PropTypes.bool,
     setUserExists: PropTypes.func,
+    authenticated: PropTypes.bool,
     setAuthenticated: PropTypes.func,
-    registering: PropTypes.bool
+    registering: PropTypes.bool.isRequired
 }
