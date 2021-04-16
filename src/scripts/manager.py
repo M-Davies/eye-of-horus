@@ -489,7 +489,7 @@ def main(parsedArgs=None):
             )
 
         # uploadedImage will the objectName so no need to check if there is a user in this function
-        index_photo.add_face_to_collection(argDict.face)
+        index_photo.add_face_to_collection(argDict.face, argDict.name)
 
         # First, start the rekog project so we can actually analyse the given images
         gesture_recog.projectHandler(True)
@@ -607,7 +607,7 @@ def main(parsedArgs=None):
             if deletedFace is None:
                 # This can sometimes happen if deletion was attempted before but was not completed
                 print(f"[WARNING] No face found in {os.getenv('FACE_RECOG_COLLECTION')} for user {argDict.profile}. We will assume it has already been removed.")
-            index_photo.add_face_to_collection(argDict.face)
+            index_photo.add_face_to_collection(argDict.face, argDict.name)
 
             # Replace user face in S3
             try:

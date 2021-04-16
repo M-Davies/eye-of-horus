@@ -178,7 +178,7 @@ def awaitProject(start):
     :param start: Boolean denoting whether we are starting or stopping the project
     """
     if start:
-        delay = 30
+        delay = 25
         maxAttempts = 40
         timeoutSeconds = delay * maxAttempts
 
