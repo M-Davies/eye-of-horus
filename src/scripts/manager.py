@@ -154,7 +154,7 @@ def streamHandler(start, sleepTime=None):
     """
     if start:
         # Boot up live stream
-        startStreamRet = subprocess.call("./startStream.sh", close_fds=True)
+        startStreamRet = subprocess.call(f"{os.getenv('ROOT_DIR')}/src/scripts/startStream.sh", close_fds=True)
         if startStreamRet != 0:
             return commons.respond(
                 messageType="ERROR",
@@ -167,7 +167,7 @@ def streamHandler(start, sleepTime=None):
             time.sleep(sleepTime)
     else:
         # Terminate streaming and reset signal handler everytime
-        stopStreamRet = subprocess.call("./stopStream.sh")
+        stopStreamRet = subprocess.call(f"{os.getenv('ROOT_DIR')}/src/scripts/stopStream.sh")
 
         if stopStreamRet != 0:
             return commons.respond(

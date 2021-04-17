@@ -18,6 +18,10 @@ function readResponse() {
 }
 
 router.post("/exists", function(req, res, next) {
+    if (req.body.user === undefined) {
+        res.status(400).send("Invalid username supplied")
+    }
+
     console.log(`Executed exists endpoint with username ${req.body.user}`)
     // Connect to AWS to check if user exists
     S3.getObjectAcl({
@@ -39,13 +43,13 @@ router.post("/exists", function(req, res, next) {
 
 router.post("/create", function(req, res, next) {
     // Verify req params
-    if (!req.body.user) {
+    if (req.body.user === undefined) {
         res.status(400).send("Invalid username supplied")
-    } else if (!req.body.face) {
+    } else if (req.body.face === undefined) {
         res.status(400).send("Invalid face path supplied")
-    } else if (!req.body.locks || Object.keys(req.body.locks).length <= 0) {
+    } else if (req.body.locks === undefined) {
         res.status(400).send("Invalid lock paths supplied")
-    } else if (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0) {
+    } else if (req.body.unlocks === undefined) {
         res.status(400).send("Invalid unlock paths supplied")
     }
 
@@ -105,11 +109,11 @@ router.post("/create", function(req, res, next) {
 
 router.post("/auth", function(req, res, next) {
     // Verify req params
-    if (!req.body.user) {
+    if (req.body.user === undefined) {
         res.status(400).send("No username supplied")
-    } else if (!req.body.face) {
+    } else if (req.body.face === undefined) {
         res.status(400).send("No face path supplied")
-    } else if ((!req.body.locks || Object.keys(req.body.locks).length <= 0) && (!req.body.unlocks || Object.keys(req.body.unlocks).length <= 0)) {
+    } else if (req.body.locks === undefined && req.body.unlocks === undefined) {
         res.status(400).send("No gesture paths supplied")
     }
 
@@ -136,6 +140,10 @@ router.post("/auth", function(req, res, next) {
     // Collect data from script
     faceRequest.stdout.on('data', function (data) {
         faceLogs += "\n" + data.toString()
+    })
+    faceRequest.stderr.on('data', function (data) {
+        console.log("STDERR")
+        console.log(data.toString())
     })
     // On close event we are sure that stream from child process is closed, read response file
     faceRequest.on('close', (code) => {
@@ -223,9 +231,9 @@ router.post("/edit", function(req, res, next) {
         unlockNoFiles = true
     }
 
-    if (!req.body.user) {
+    if (req.body.user === undefined) {
         res.status(400).send("No username supplied")
-    } else if (!req.body.face && lockNoFiles && unlockNoFiles) {
+    } else if (req.body.face === undefined && lockNoFiles === true && unlockNoFiles === true) {
         res.status(400).send("No editable objects supplied")
     }
 
@@ -285,7 +293,7 @@ router.post("/delete", function(req, res, next) {
     let logs = null
 
     // Verify req params
-    if (!req.body.user) {
+    if (req.body.user === undefined) {
         res.status(400).send("No username supplied")
     }
 

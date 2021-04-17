@@ -31,23 +31,22 @@ export default function AuthenticateComponent({
 
     async function createUser() {
         // Upload files (returning the error if something failed)
-        if (!faceFile ) { return "No face file was selected" }
-        if (!lockFiles ) { return "No lock files were selected" }
-        if (!unlockFiles) { return "No unlock files were selected" }
-        let facePath = await uploadFiles(faceFile)
-        let lockPaths = await uploadFiles(Array.from(lockFiles))
-        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
-
-        // Create user profile
         let params = new FormData()
         params.append("user", username)
+
+        if (faceFile === undefined) { return "No face file was selected" }
+        let facePath = await uploadFiles(faceFile)
         params.append("face", facePath)
+        if (lockFiles === undefined) { return "No lock files were selected" }
+        let lockPaths = await uploadFiles(Array.from(lockFiles))
         params.append("locks", lockPaths)
+        if (unlockFiles === undefined) { return "No unlock files were selected" }
+        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
         params.append("unlocks", unlockPaths)
 
+        // Create user profile
         return axios.post("http://localhost:3001/user/create", params)
             .then(res => {
-                setLoading(false)
                 if (res.status === 201) {
                     return true
                 } else {
@@ -55,7 +54,6 @@ export default function AuthenticateComponent({
                 }
             })
             .catch(function (error) {
-                setLoading(false)
                 if (error.response.data) {
                     return error.response.data
                 } else {
@@ -66,19 +64,18 @@ export default function AuthenticateComponent({
 
     async function loginUser() {
         // Upload files (returning the error if something failed)
-        if (!faceFile ) { return "No face file was selected" }
-        if (!unlockFiles) { return "No unlock files were selected" }
-        let facePath = await uploadFiles(faceFile)
-        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
-
-        // Create user profile
         let params = new FormData()
         params.append("user", username)
+        if (faceFile === undefined) { return "No face file was selected" }
+        let facePath = await uploadFiles(faceFile)
         params.append("face", facePath)
+        if (unlockFiles === undefined) { return "No unlock files were selected" }
+        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
         params.append("unlocks", unlockPaths)
+
+        // Create user profile
         return axios.post("http://localhost:3001/user/auth", params)
             .then(res => {
-                setLoading(false)
                 if (res.status === 200) {
                     return true
                 } else {
@@ -86,7 +83,6 @@ export default function AuthenticateComponent({
                 }
             })
             .catch(function (error) {
-                setLoading(false)
                 if (error.response.data) {
                     return error.response.data
                 } else {
@@ -112,6 +108,7 @@ export default function AuthenticateComponent({
         if (registering) {
             // Send create request to server
             const userCreateRes = await createUser()
+            setLoading(false)
 
             // If successful at creating user, move to login
             if (userCreateRes === true) {
@@ -130,6 +127,7 @@ export default function AuthenticateComponent({
         } else {
             // Send login request to server
             const userLoginRes = await loginUser()
+            setLoading(false)
 
             // If successful at logging in user, move to dashboard
             if (userLoginRes === true) {
@@ -224,7 +222,7 @@ export default function AuthenticateComponent({
                                 id="lock_gesture_form"
                                 type="file"
                             >
-                                <Form.File.Label>You are logging in so no need for a lock gesture combination</Form.File.Label>
+                                <Form.File.Label>No lock gesture combination needed for logging in</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
                         </Form.Group>

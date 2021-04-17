@@ -178,8 +178,8 @@ def awaitProject(start):
     :param start: Boolean denoting whether we are starting or stopping the project
     """
     if start:
-        delay = 30
-        maxAttempts = 40
+        delay = 20
+        maxAttempts = 50
         timeoutSeconds = delay * maxAttempts
 
         print(f"[INFO] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")

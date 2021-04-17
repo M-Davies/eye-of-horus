@@ -6,6 +6,7 @@
 .pnp.js
 .env
 **/server.log
+**/stream.log
 
 # resources
 **/__pycache__/**
