@@ -103,7 +103,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
     } else {
         return (
             <div className="logout-wrapper">
-                <Button variant="secondary" href="/dashboard">Back</Button>
+                <Button variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
                 <h1>Select your face file and lock combination to log out</h1>
                 <div className="user-forms">
                     <Form onSubmit={handleSubmit}>

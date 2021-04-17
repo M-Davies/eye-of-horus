@@ -276,7 +276,7 @@ export default function AuthenticateComponent({
             <div className="authenticate-wrapper">
                 {getHeader()}
                 <div className="user-forms">
-                    <Button variant="secondary" href="/">Back</Button>
+                    <Button variant="secondary" href="/" disabled={loading === true ? true : false}>Back</Button>
                     <Form onSubmit={handleSubmit}>
                         <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
                             <Form.File

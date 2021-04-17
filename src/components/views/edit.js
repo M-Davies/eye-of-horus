@@ -156,7 +156,7 @@ export default function EditComponent({ username, authenticated }) {
         return (
             <div className="edit-wrapper">
                 <h1>Please change which features you would like to edit</h1>
-                <Button variant="secondary" href="/dashboard">Back</Button>
+                <Button variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
                 <Form onSubmit={handleSubmit}>
                         <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
                             <Form.File
