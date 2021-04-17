@@ -200,7 +200,7 @@ def awaitProject(start):
             )
     else:
         # Stopping a model takes less time than starting one
-        stopTimeout = 150
+        stopTimeout = 180
         print(f"[INFO] Request to stop {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
         time.sleep(stopTimeout)
 

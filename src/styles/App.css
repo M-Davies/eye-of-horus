@@ -1,8 +1,9 @@
-.App, html{
+.App, html {
   text-align: center;
   background-color: gray;
   height: 100%;
   width: 100%;
+  padding: 1%;
 }
 
 .App-logo {
@@ -54,4 +55,17 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+#back_button {
+  margin-bottom: 2%;
+}
+
+#video_display {
+  position: absolute;
+  right: 0%;
+  transform: rotateY(180deg);
+  -webkit-transform:rotateY(180deg);
+  width: 40%;
+  height: 40%;
 }

@@ -5,17 +5,20 @@ import Spinner from 'react-bootstrap/Spinner'
 import ListGroup from 'react-bootstrap/ListGroup'
 import PropTypes from 'prop-types'
 import axios from 'axios'
+import Webcam from 'react-webcam'
 
 import { ClearTokens } from '../token'
-import { uploadFiles } from '../middleware'
+import { uploadFiles, uploadEncoded } from '../middleware'
 
 export default function LogoutComponent({ username, authenticated, setAuthenticated }) {
     const [loading, setLoading] = useState(false)
+    const [streaming, setStreaming] = useState(false)
     const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
+    const webcamRef = React.useRef(null)
 
     const handleLockChange = (files) => {
         setLockFiles(files)
@@ -51,15 +54,57 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         }
     }
 
+    function getFaceForm() {
+        if (streaming) {
+            return (
+                <fieldset disabled>
+                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                        <Form.File
+                            id="face_file_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Disable video permission to authenticate your face using a file</Form.File.Label>
+                            <Form.File.Input />
+                        </Form.File>
+                    </Form.Group>
+                </fieldset>
+            )
+        } else {
+            return (
+                <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                    <Form.File
+                        id="face_file_form"
+                        type="file"
+                    >
+                        <Form.File.Label>Face File</Form.File.Label>
+                        <Form.File.Input />
+                    </Form.File>
+                </Form.Group>
+            )
+        }
+    }
+
     async function logoutUser() {
-        if (!faceFile ) { return "No face file was selected" }
-        if (!lockFiles ) { return "No lock files were selected" }
-        let facePath = await uploadFiles(faceFile)
-        let lockPaths = await uploadFiles(Array.from(lockFiles))
         let params = new FormData()
         params.append("user", username)
-        params.append("face", facePath)
+        if (faceFile === undefined && streaming === false) {
+            return "No face file was selected"
+        } else if (streaming === false) {
+            const facePath = await uploadFiles(faceFile)
+            if (!facePath instanceof Array) { return "Failed to upload face file" }
+            params.append("face", facePath)
+        } else {
+            // Get & upload face picture if streaming
+            const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
+            if (!facePath instanceof Array) { return "Failed to upload screenshot from webcam" }
+            params.append("face", facePath)
+        }
+
+        if (lockFiles === undefined) { return "No lock files were selected" }
+        const lockPaths = await uploadFiles(Array.from(lockFiles))
+        if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
         params.append("locks", lockPaths)
+
         return axios.post("http://localhost:3001/user/auth", params)
             .then(res => {
                 if (res.status === 200) {
@@ -101,21 +146,31 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
     if (authenticated === false) {
         window.location.href = "/"
     } else {
+        if (navigator.mediaDevices.getUserMedia !== null) {
+            navigator.getUserMedia({video:true},
+                function (stream) {
+                    setStreaming(true)
+                },
+                function (e) {
+                    setStreaming(false)
+                    if (e.name === "NotAllowedError") {
+                        console.log("Video perms denied")
+                        document.getElementById("video_display").hidden = true
+                    } else {
+                        console.log("background error : " + e.name)
+                    }
+                }
+            )
+        }
+
         return (
             <div className="logout-wrapper">
-                <Button variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
                 <h1>Select your face file and lock combination to log out</h1>
                 <div className="user-forms">
+                    <Button id="back_button" variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
+                    <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
-                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                            <Form.File
-                                id="face_file_form"
-                                type="file"
-                            >
-                                <Form.File.Label>Face File</Form.File.Label>
-                                <Form.File.Input />
-                            </Form.File>
-                        </Form.Group>
+                        {getFaceForm()}
                         <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
                             <Form.File
                                 id="lock_gesture_form"

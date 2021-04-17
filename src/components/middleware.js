@@ -1,5 +1,22 @@
 import axios from 'axios'
 
+export function uploadEncoded(encoded) {
+    let params = new FormData()
+    params.append("encoded", encoded)
+
+    return axios.post("http://localhost:3001/upload/encoded", params)
+        .then(res => {
+            return Array.from(res.data)
+        })
+        .catch(function (error) {
+            try {
+                return error.response.data
+            } catch (err) {
+                throw new Error(error.toString())
+            }
+        })
+}
+
 export function uploadFiles(files) {
     let params = new FormData()
 
@@ -15,7 +32,7 @@ export function uploadFiles(files) {
     }
 
     // Upload and return paths
-    return axios.post(`http://localhost:3001/upload`, params)
+    return axios.post(`http://localhost:3001/upload/file`, params)
         .then(res => {
             return Array.from(res.data)
         })

@@ -4,9 +4,10 @@ import Button from 'react-bootstrap/Button'
 import Spinner from 'react-bootstrap/Spinner'
 import ListGroup from 'react-bootstrap/ListGroup'
 import PropTypes from 'prop-types'
+import Webcam from 'react-webcam'
 import axios from 'axios'
 
-import { uploadFiles } from '../middleware'
+import { uploadFiles, uploadEncoded } from '../middleware'
 
 import "../../styles/authenticate.css"
 
@@ -19,6 +20,7 @@ export default function AuthenticateComponent({
     registering
 }) {
     const [loading, setLoading] = useState(false)
+    const [streaming, setStreaming] = useState(false)
     const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [unlockFiles, setUnlockFiles] = useState()
@@ -28,21 +30,34 @@ export default function AuthenticateComponent({
     const [unlockDisplay, setUnlockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
+    const webcamRef = React.useRef(null)
 
     async function createUser() {
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
+        if (faceFile === undefined && streaming === false) {
+            return "No face file was selected"
+        } else if (streaming === false) {
+            const facePath = await uploadFiles(faceFile)
+            if (!facePath instanceof Array) { return "Failed to upload face file" }
+            params.append("face", facePath)
+        } else {
+            // Get & upload face picture if streaming
+            const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
+            if (!facePath instanceof Array) { return "Failed to upload screenshot from webcam" }
+            params.append("face", facePath)
+        }
 
-        if (faceFile === undefined) { return "No face file was selected" }
-        let facePath = await uploadFiles(faceFile)
-        params.append("face", facePath)
         if (lockFiles === undefined) { return "No lock files were selected" }
-        let lockPaths = await uploadFiles(Array.from(lockFiles))
+        const lockPaths = await uploadFiles(Array.from(lockFiles))
+        if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
         params.append("locks", lockPaths)
+
         if (unlockFiles === undefined) { return "No unlock files were selected" }
-        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
-        params.append("unlocks", unlockPaths)
+        const unlockPaths = await uploadFiles(Array.from(unlockFiles))
+        if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
+        params.append("locks", unlockPaths)
 
         // Create user profile
         return axios.post("http://localhost:3001/user/create", params)
@@ -66,14 +81,25 @@ export default function AuthenticateComponent({
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
-        if (faceFile === undefined) { return "No face file was selected" }
-        let facePath = await uploadFiles(faceFile)
-        params.append("face", facePath)
+        if (faceFile === undefined && streaming === false) {
+            return "No face file was selected"
+        } else if (streaming === false) {
+            const facePath = await uploadFiles(faceFile)
+            if (!facePath instanceof Array) { return "Failed to upload face file" }
+            params.append("face", facePath)
+        } else {
+            // Get & upload face picture if streaming
+            const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
+            if (!facePath instanceof Array) { return "Failed to upload screenshot from webcam" }
+            params.append("face", facePath)
+        }
+
         if (unlockFiles === undefined) { return "No unlock files were selected" }
-        let unlockPaths = await uploadFiles(Array.from(unlockFiles))
+        const unlockPaths = await uploadFiles(Array.from(unlockFiles))
+        if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
         params.append("unlocks", unlockPaths)
 
-        // Create user profile
+        // Authenticate user
         return axios.post("http://localhost:3001/user/auth", params)
             .then(res => {
                 if (res.status === 200) {
@@ -178,11 +204,41 @@ export default function AuthenticateComponent({
         // Header changes depending on whether we are registering or logging in
         if (registering) {
             return (
-                <h2 id="register_header">Hello {username}! Looks like this is your first time, so please enter your chosen face, lock and unlock combinations below to create an account</h2>
+                <h2 id="authenticate_header">Hello {username}! Looks like this is your first time, so please enter your chosen face, lock and unlock combinations below to create an account</h2>
             )
         } else {
             return (
-                <h2 id="login_header">Welcome back {username}. Please enter your chosen face, lock and unlock combinations below to authenticate yourself</h2>
+                <h2 id="authenticate_header">Welcome back {username}. Please enter your chosen face, lock and unlock combinations below to authenticate yourself</h2>
+            )
+        }
+    }
+
+    function getFaceForm() {
+        if (streaming) {
+            return (
+                <fieldset disabled>
+                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                        <Form.File
+                            id="face_file_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Disable video permission to authenticate your face using a file</Form.File.Label>
+                            <Form.File.Input />
+                        </Form.File>
+                    </Form.Group>
+                </fieldset>
+            )
+        } else {
+            return (
+                <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                    <Form.File
+                        id="face_file_form"
+                        type="file"
+                    >
+                        <Form.File.Label>Face File</Form.File.Label>
+                        <Form.File.Input />
+                    </Form.File>
+                </Form.Group>
             )
         }
     }
@@ -270,21 +326,31 @@ export default function AuthenticateComponent({
     } else if (userExists === false && window.location.pathname === "/login") {
         window.location.href = "/register"
     } else {
+        if (navigator.mediaDevices.getUserMedia !== null) {
+            navigator.getUserMedia({video:true},
+                function (stream) {
+                    setStreaming(true)
+                },
+                function (e) {
+                    setStreaming(false)
+                    if (e.name === "NotAllowedError") {
+                        console.log("Video perms denied")
+                        document.getElementById("video_display").hidden = true
+                    } else {
+                        console.log("background error : " + e.name)
+                    }
+                }
+            )
+        }
+
         return (
             <div className="authenticate-wrapper">
                 {getHeader()}
                 <div className="user-forms">
-                    <Button variant="secondary" href="/" disabled={loading === true ? true : false}>Back</Button>
+                    <Button id="back_button" variant="secondary" href="/" disabled={loading === true ? true : false}>Back</Button>
+                    <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
-                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                            <Form.File
-                                id="face_file_form"
-                                type="file"
-                            >
-                                <Form.File.Label>Face File</Form.File.Label>
-                                <Form.File.Input />
-                            </Form.File>
-                        </Form.Group>
+                        {getFaceForm()}
                         {getGestureForms()}
                         {getButton()}
                     </Form>
