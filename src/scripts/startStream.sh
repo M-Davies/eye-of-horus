@@ -14,7 +14,7 @@ if [ $ret -eq 1 ]; then
     export $(egrep -v '^#' $PWD/../../.env | xargs)
 
     # Start streaming to aws in background, squashing all debug as we make our own
-    gst-launch-1.0 --quiet avfvideosrc device-index=0 ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=20/1 ! x264enc bframes=0 key-int-max=65 bitrate=300 ! video/x-h264,stream-format=avc,alignment=au,profile=baseline ! kvssink stream-name="CameraVideoStream" storage-size=512 access-key="${ACCESS_KEY}" secret-key="${SECRET_KEY}" aws-region="eu-west-1" > /dev/null 2>&1 &
+    gst-launch-1.0 --quiet avfvideosrc device-index=0 ! videoconvert ! video/x-raw,format=I420,width=640,height=480,framerate=20/1 ! x264enc bframes=0 key-int-max=65 bitrate=300 ! video/x-h264,stream-format=avc,alignment=au,profile=baseline ! kvssink stream-name="CameraVideoStream" storage-size=512 access-key="${ACCESS_KEY}" secret-key="${SECRET_KEY}" aws-region="eu-west-1" > "${ROOT_DIR}/src/scripts/stream.log" > /dev/null 2>&1 &
 
     echo "[SUCCESS] Stream is running!"
     exit 0

@@ -131,7 +131,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                                     id="unlock_gesture_form"
                                     type="file"
                                 >
-                                    <Form.File.Label>You are logging out so no need for a unlock gesture combination</Form.File.Label>
+                                    <Form.File.Label>No unlock gesture combination needed for logging out</Form.File.Label>
                                     <Form.File.Input multiple/>
                                 </Form.File>
                             </Form.Group>
