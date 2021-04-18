@@ -10,6 +10,8 @@ import Webcam from 'react-webcam'
 import { ClearTokens } from '../token'
 import { uploadFiles, uploadEncoded } from '../middleware'
 
+import '../../styles/logout.css'
+
 export default function LogoutComponent({ username, authenticated, setAuthenticated }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
@@ -18,18 +20,21 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
+    const [showLockDisplay, setShowLockDisplay] = useState(false)
     const webcamRef = React.useRef(null)
 
     const handleLockChange = (files) => {
-        setLockFiles(files)
-        let currentLockDisplay = []
-        let lockCount = 1
-        Array.from(files).forEach(file => {
-            let key = `lock-placeholder-${lockCount}`
-            currentLockDisplay.push(<ListGroup.Item key={key}>Lock Gesture {lockCount} = {file.name}</ListGroup.Item>)
-            lockCount++
-        })
-        setLockDisplay(currentLockDisplay)
+        if (files !== null) {
+            setLockFiles(files)
+            let currentLockDisplay = []
+            let lockCount = 1
+            Array.from(files).forEach(file => {
+                let key = `lock-placeholder-${lockCount}`
+                currentLockDisplay.push(<ListGroup.Item key={key}>Lock Gesture {lockCount} = {file.name}</ListGroup.Item>)
+                lockCount++
+            })
+            setLockDisplay(currentLockDisplay)
+        }
     }
 
     function getButton() {
@@ -128,12 +133,10 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         const userLogoutRes = await logoutUser()
         setLoading(false)
 
-        // If successful at creating user, move to login
         if (userLogoutRes === true) {
             ClearTokens()
             window.location.href = "/"
         } else {
-            // If unsuccessful, return to default registration with error alert
             if (userLogoutRes.TYPE === undefined) {
                 alert(`${userLogoutRes}`)
             } else {
@@ -165,9 +168,9 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
 
         return (
             <div className="logout-wrapper">
-                <h1>Select your face file and lock combination to log out</h1>
+                <h1 id="logout_header">Select your face file and lock combination to log out</h1>
                 <div className="user-forms">
-                    <Button id="back_button" variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
+                    <Button id="back_button" variant="info" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
                     <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
                         {getFaceForm()}
@@ -179,6 +182,12 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                                 <Form.File.Label>Lock Combination</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
+                            <Form.Check
+                                type="checkbox"
+                                label="Show Lock Combination"
+                                defaultChecked={showLockDisplay}
+                                onChange={() => setShowLockDisplay(!showLockDisplay)}
+                            />
                         </Form.Group>
                         <fieldset disabled>
                             <Form.Group>
@@ -193,7 +202,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                         </fieldset>
                         {getButton()}
                     </Form>
-                    <ListGroup className="lock-display">
+                    <ListGroup className="lock-display" hidden={showLockDisplay === true ? false : true}>
                         {lockDisplay}
                     </ListGroup>
                 </div>

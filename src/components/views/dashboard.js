@@ -22,7 +22,6 @@ export default function DashboardComponent({ username, authenticated }) {
                 .then(res => {
                     setDeleting(false)
                     if (res.status === 200) {
-                        alert("User has been successfully deleted")
                         ClearTokens()
                         window.location.href = "/"
                     } else {

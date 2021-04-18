@@ -1,16 +1,22 @@
-#form_label {
-    color: white;
-}
-
-.login-wrapper, html {
-    background-color: gray;
-    height: 100%;
-    width: 100%;
-}
-
 .login-headers {
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
+    padding-top: 1%;
+    padding-bottom: 1%;
+}
+
+#sub_header {
+    font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+    font-size: 60px;
+}
+
+#username_header {
+    font-family: 'Dancing Script', cursive;
+    font-size: 40px;
+}
+
+.login-forms {
+    padding: 0.5%;
 }

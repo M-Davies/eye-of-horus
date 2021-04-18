@@ -38,10 +38,13 @@ export default class NavbarComponent extends Component {
                         />
                         {' '} Eye Of Horus
                     </Navbar.Brand>
+                    <Navbar.Collapse className="justify-content-end" id="nav_title_wrapper">
+                        <Navbar.Text id="nav_title">SEEING IS BELIEVING</Navbar.Text>
+                    </Navbar.Collapse>
                     <Navbar.Collapse className="justify-content-end">
-                    <Nav className="auto">
-                        {profileText(this.props.username, this.props.authenticated)}
-                    </Nav>
+                        <Nav className="auto">
+                            {profileText(this.props.username, this.props.authenticated)}
+                        </Nav>
                     </Navbar.Collapse>
                 </Navbar>
             </div>

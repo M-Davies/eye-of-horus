@@ -27,16 +27,18 @@ export default function AuthenticateComponent({
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="lock-placeholder">No lock gestures added</ListGroup.Item>
     ])
+    const [showLockDisplay, setShowLockDisplay] = useState(false)
     const [unlockDisplay, setUnlockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
     ])
+    const [showUnlockDisplay, setShowUnlockDisplay] = useState(false)
     const webcamRef = React.useRef(null)
 
     async function createUser() {
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
-        if (faceFile === undefined && streaming === false) {
+        if ((faceFile === undefined || faceFile === null) && streaming === false) {
             return "No face file was selected"
         } else if (streaming === false) {
             const facePath = await uploadFiles(faceFile)
@@ -49,15 +51,21 @@ export default function AuthenticateComponent({
             params.append("face", facePath)
         }
 
-        if (lockFiles === undefined) { return "No lock files were selected" }
+        if (lockFiles === undefined || lockFiles === null) { return "No lock files were selected" }
         const lockPaths = await uploadFiles(Array.from(lockFiles))
         if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
         params.append("locks", lockPaths)
 
-        if (unlockFiles === undefined) { return "No unlock files were selected" }
+        if (unlockFiles === undefined || unlockFiles === null) { return "No unlock files were selected" }
         const unlockPaths = await uploadFiles(Array.from(unlockFiles))
         if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
-        params.append("locks", unlockPaths)
+        params.append("unlocks", unlockPaths)
+
+        console.log("Requesting user create with params")
+        console.log(params.username)
+        console.log(params.face)
+        console.log(params.locks)
+        console.log(params.unlocks)
 
         // Create user profile
         return axios.post("http://localhost:3001/user/create", params)
@@ -81,7 +89,7 @@ export default function AuthenticateComponent({
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
-        if (faceFile === undefined && streaming === false) {
+        if ((faceFile === undefined || faceFile === null) && streaming === false) {
             return "No face file was selected"
         } else if (streaming === false) {
             const facePath = await uploadFiles(faceFile)
@@ -94,7 +102,7 @@ export default function AuthenticateComponent({
             params.append("face", facePath)
         }
 
-        if (unlockFiles === undefined) { return "No unlock files were selected" }
+        if (unlockFiles === undefined || unlockFiles === null) { return "No unlock files were selected" }
         const unlockPaths = await uploadFiles(Array.from(unlockFiles))
         if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
         params.append("unlocks", unlockPaths)
@@ -204,11 +212,11 @@ export default function AuthenticateComponent({
         // Header changes depending on whether we are registering or logging in
         if (registering) {
             return (
-                <h2 id="authenticate_header">Hello {username}! Looks like this is your first time, so please enter your chosen face, lock and unlock combinations below to create an account</h2>
+                <h2 id="authenticate_header">Hello {username}! Please enter or stream a face and upload your lock and unlock combinations to create an account</h2>
             )
         } else {
             return (
-                <h2 id="authenticate_header">Welcome back {username}. Please enter your chosen face, lock and unlock combinations below to authenticate yourself</h2>
+                <h2 id="authenticate_header">Welcome back {username}. Please enter or stream your face and upload your unlock combination</h2>
             )
         }
     }
@@ -256,6 +264,12 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Chose at least 4 gestures as your lock gesture combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
+                        <Form.Check
+                            type="checkbox"
+                            label="Show Lock Combination"
+                            defaultChecked={showLockDisplay}
+                            onChange={() => setShowLockDisplay(!showLockDisplay)}
+                        />
                     </Form.Group>
                     <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                         <Form.File
@@ -265,6 +279,12 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Chose at least 4 other gestures as your unlock gesture combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
+                        <Form.Check
+                            type="checkbox"
+                            label="Show Unlock Combination"
+                            defaultChecked={showUnlockDisplay}
+                            onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                        />
                     </Form.Group>
                 </div>
             )
@@ -291,6 +311,12 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Please enter your unlock combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
+                        <Form.Check
+                            type="checkbox"
+                            label="Show Unlock Combination"
+                            defaultChecked={showUnlockDisplay}
+                            onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                        />
                     </Form.Group>
                 </div>
             )
@@ -347,17 +373,17 @@ export default function AuthenticateComponent({
             <div className="authenticate-wrapper">
                 {getHeader()}
                 <div className="user-forms">
-                    <Button id="back_button" variant="secondary" href="/" disabled={loading === true ? true : false}>Back</Button>
+                    <Button id="back_button" variant="info" href="/" disabled={loading === true ? true : false}>Back</Button>
                     <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
                         {getFaceForm()}
                         {getGestureForms()}
                         {getButton()}
                     </Form>
-                    <ListGroup className="lock-display">
+                    <ListGroup className="lock-display" hidden={showLockDisplay === true ? false : true}>
                         {lockDisplay}
                     </ListGroup>
-                    <ListGroup className="unlock-display">
+                    <ListGroup className="unlock-display" hidden={showUnlockDisplay === true ? false : true}>
                         {unlockDisplay}
                     </ListGroup>
                 </div>

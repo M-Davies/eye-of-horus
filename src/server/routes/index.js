@@ -59,7 +59,7 @@ router.post('/upload/file', function(req, res, next) {
 
 router.post('/upload/encoded', function(req, res, next) {
   if (req.body.encoded === undefined) { res.status(500).send("No encoded object uploaded") }
-  const path = `${process.env.ROOT_DIR}/src/server/public/tempFile.jpg`
+  const path = `${process.env.ROOT_DIR}/src/server/public/${Math.floor((Math.random() * 1000000) + 1).toString()}.jpg`
 
   // Delete old copy if it exists
   try {
