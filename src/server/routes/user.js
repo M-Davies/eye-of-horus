@@ -1,6 +1,7 @@
 var express = require("express")
 var router = express.Router()
 var spawn = require('child_process').spawn
+var spawnSync = require('child_process').spawnSync
 var fs = require('fs')
 var cors = require('cors')
 var AWS = require('aws-sdk')
@@ -8,6 +9,8 @@ var AWS = require('aws-sdk')
 var S3 = new AWS.S3()
 
 router.use(cors())
+
+const badCreds = `Incorrect face or gesture combination given`
 
 function readResponse() {
     try {
@@ -107,6 +110,60 @@ router.post("/create", function(req, res, next) {
     })
 })
 
+function checkFace(user, face) {
+    let faceResponse = null
+
+    // Authenticate face
+    const faceArgs = [`${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "compare", "-f", `${face}`, "-p", `${user}`]
+
+    try {
+        spawnSync("python", faceArgs)
+    } catch (err) {
+        console.log(`Face child process errored with message: ${err}`)
+        faceResponse = readResponse()
+        if (faceResponse === false) {
+            return 500
+        } else {
+            return faceResponse
+        }
+    }
+
+    // Read response file if exists
+    console.log("Face child process close all stdio with exit code 0")
+    faceResponse = readResponse()
+    if (faceResponse === false) {
+        return 500
+    } else if (faceResponse.TYPE === "ERROR") {
+        // If error was thrown by python (usually if the faces don't match), return the corresponding code.
+        return 400
+    } else if (faceResponse.TYPE === "SUCCESS") {
+        return 200
+    } else {
+        return 500
+    }
+}
+
+router.post("/face", function(req, res, next) {
+    // Verify req params
+    if (req.body.user === undefined) {
+        res.status(400).send("No username supplied")
+    } else if (req.body.face === undefined) {
+        res.status(400).send("No face path supplied")
+    }
+
+    // Execute Face Req
+    const faceRes = checkFace(req.body.user, req.body.face)
+
+    // Return response
+    if (faceRes === 400) {
+        res.status(400).send(badCreds)
+    } else if (faceRes === 200) {
+        res.sendStatus(200)
+    } else {
+        res.status(500).send("Internal Server Error")
+    }
+})
+
 router.post("/auth", function(req, res, next) {
     // Verify req params
     if (req.body.user === undefined) {
@@ -117,100 +174,62 @@ router.post("/auth", function(req, res, next) {
         res.status(400).send("No gesture paths supplied")
     }
 
-    let faceResponse = null
-    let faceLogs = null
+    const faceRes = checkFace(req.body.user, req.body.face)
+    if (faceRes === 400) {
+        res.status(400).send(badCreds)
+    } else if (faceRes === 200) {
+        let gestureResponse = null
+        let gestureLogs = null
 
-    // Authenticate face
-    const faceArgs = [
-        `${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "compare",
-        "-f", `${req.body.face}`, "-p", `${req.body.user}`
-    ]
-    const faceRequest = spawn("python", faceArgs)
+        // Authenticate gestures
+        let gestureArgs = [`${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "gesture", "-p", `${req.body.user}`]
 
-    // On error event, something has gone wrong early so read response file if exists or exit with error
-    faceRequest.on('error', function(err) {
-        console.log(`Face child process errored with message: ${err}`)
-        faceResponse = readResponse()
-        if (faceResponse === false) {
-            res.sendStatus(500)
+        if (req.body.locks) {
+            gestureArgs.push("-l")
+            Array.from((req.body.locks).split(",")).forEach(gesture => {
+                gestureArgs.push(gesture)
+            })
         } else {
-            res.status(400).send(faceResponse)
+            gestureArgs.push("-u")
+            Array.from((req.body.unlocks).split(",")).forEach(gesture => {
+                gestureArgs.push(gesture)
+            })
         }
-    })
-    // Collect data from script
-    faceRequest.stdout.on('data', function (data) {
-        faceLogs += "\n" + data.toString()
-    })
-    faceRequest.stderr.on('data', function (data) {
-        console.log("STDERR")
-        console.log(data.toString())
-    })
-    // On close event we are sure that stream from child process is closed, read response file
-    faceRequest.on('close', (code) => {
-        const badCreds = `Incorrect face or gesture combination given for ${req.body.user}`
-        console.log(`Face child process close all stdio with code ${code}\nLogs collected:\n${faceLogs}`)
+        const gestureRequest = spawn("python", gestureArgs)
 
-        // Read response file if exists
-        faceResponse = readResponse()
-        if (faceResponse === false) {
-            res.status(500).send("Internal server error")
-        } else if (faceResponse.TYPE === "ERROR") {
-            // If error was thrown by python (usually if the faces don't match), return the corresponding code.
-            res.status(400).send(badCreds)
-        } else if (faceResponse.TYPE === "SUCCESS") {
-            let gestureResponse = null
-            let gestureLogs = null
-
-            // Authenticate gestures
-            let gestureArgs = [`${process.env.ROOT_DIR}/src/scripts/manager.py`, "-m", "-a", "gesture", "-p", `${req.body.user}`]
-
-            if (req.body.locks) {
-                gestureArgs.push("-l")
-                Array.from((req.body.locks).split(",")).forEach(gesture => {
-                    gestureArgs.push(gesture)
-                })
+        // On error event, something has gone wrong early so read response file if exists or exit with error
+        gestureRequest.on('error', function(err) {
+            console.log(`Gesture child process errored with message: ${err}`)
+            gestureResponse = readResponse()
+            if (gestureResponse === false) {
+                res.sendStatus(500)
             } else {
-                gestureArgs.push("-u")
-                Array.from((req.body.unlocks).split(",")).forEach(gesture => {
-                    gestureArgs.push(gesture)
-                })
+                res.status(400).send(gestureResponse)
             }
-            const gestureRequest = spawn("python", gestureArgs)
+        })
+        // Collect data from script
+        gestureRequest.stdout.on('data', function (data) {
+            gestureLogs += "\n" + data.toString()
+        })
+        // On close event we are sure that stream from child process is closed, read response file
+        gestureRequest.on('close', (code) => {
+            console.log(`Gesture child process close all stdio with code ${code}\nLogs collected:\n${gestureLogs}`)
+            // Read response file if exists
+            gestureResponse = readResponse()
+            if (gestureResponse === false) {
+                res.sendStatus(500)
+            }
 
-            // On error event, something has gone wrong early so read response file if exists or exit with error
-            gestureRequest.on('error', function(err) {
-                console.log(`Gesture child process errored with message: ${err}`)
-                gestureResponse = readResponse()
-                if (gestureResponse === false) {
-                    res.sendStatus(500)
-                } else {
-                    res.status(400).send(gestureResponse)
-                }
-            })
-            // Collect data from script
-            gestureRequest.stdout.on('data', function (data) {
-                gestureLogs += "\n" + data.toString()
-            })
-            // On close event we are sure that stream from child process is closed, read response file
-            gestureRequest.on('close', (code) => {
-                console.log(`Gesture child process close all stdio with code ${code}\nLogs collected:\n${gestureLogs}`)
-                // Read response file if exists
-                gestureResponse = readResponse()
-                if (gestureResponse === false) {
-                    res.sendStatus(500)
-                }
-
-                // If error was thrown by python (usually if the gesture combination is wrong), return the corresponding code.
-                if (gestureResponse.TYPE === "ERROR") {
-                    res.status(400).send(badCreds)
-                } else {
-                    res.sendStatus(200)
-                }
-            })
-        } else {
-            res.status(500).send("Server error")
-        }
-    })
+            // If error was thrown by python (usually if the gesture combination is wrong), return the corresponding code.
+            if (gestureResponse.TYPE === "ERROR") {
+                res.status(400).send(badCreds)
+            } else {
+                res.sendStatus(200)
+            }
+        })
+    } else {
+        res.status(500).send("Internal Server Error")
+    }
 })
 
 router.post("/edit", function(req, res, next) {
