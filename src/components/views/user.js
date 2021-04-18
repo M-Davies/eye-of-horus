@@ -92,13 +92,12 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
     return (
         <div className="login-wrapper">
             <div className="login-headers">
-                <h1>SEEING IS BELIEVING</h1>
-                <h2>Welcome to the Eye of Horus, a multi-factor biometric authentication system! Please create or login to an account below to get started</h2>
+                <h1 id="sub_header">Welcome to the Eye of Horus<br></br>A multi-factor biometric authentication system</h1>
+                <h2 id="username_header">Please enter a new or existing username</h2>
             </div>
             <div className="login-forms">
                 <Form onSubmit={handleSubmit}>
                     <Form.Group controlId="formBasicText">
-                        <Form.Label id="form_label">Username</Form.Label>
                         <Form.Control type="text" placeholder="Enter username" onChange={e => setName(e.target.value)}/>
                     </Form.Group>
                     {getButton()}

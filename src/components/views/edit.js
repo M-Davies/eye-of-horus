@@ -5,20 +5,26 @@ import ListGroup from 'react-bootstrap/ListGroup'
 import Button from 'react-bootstrap/Button'
 import Spinner from 'react-bootstrap/Spinner'
 import PropTypes from 'prop-types'
+import Webcam from 'react-webcam'
 
-import { uploadFiles } from '../middleware'
+import { uploadFiles, uploadEncoded } from '../middleware'
 
 export default function EditComponent({ username, authenticated }) {
     const [loading, setLoading] = useState(false)
+    const [streaming, setStreaming] = useState(false)
+    const [editFace, setEditFace] = useState(false)
     const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [unlockFiles, setUnlockFiles] = useState()
     const [lockDisplay, setLockDisplay] = useState([
-        <ListGroup.Item variant="secondary" key="lock-placeholder">No lock gestures added</ListGroup.Item>
+        <ListGroup.Item variant="secondary" key="lock-placeholder">Lock gesture combination unchanged</ListGroup.Item>
     ])
+    const [showLockDisplay, setShowLockDisplay] = useState(false)
     const [unlockDisplay, setUnlockDisplay] = useState([
-        <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
+        <ListGroup.Item variant="secondary" key="unlock-placeholder">Unlock gesture combination unchanged</ListGroup.Item>
     ])
+    const [showUnlockDisplay, setShowUnlockDisplay] = useState(false)
+    const webcamRef = React.useRef(null)
 
     async function editUser() {
         let lockNoFiles = null
@@ -33,24 +39,35 @@ export default function EditComponent({ username, authenticated }) {
         } catch (err) {
             unlockNoFiles = true
         }
-        if (!faceFile && lockNoFiles && unlockNoFiles) {
+
+        if ((faceFile === undefined && streaming === false) && lockNoFiles && unlockNoFiles) {
             return "Nothing selected to edit!"
         }
 
         let params = new FormData()
         params.append("user", username)
 
-        if (faceFile) {
-            let facePath = await uploadFiles(faceFile)
-            params.append("face", facePath)
+        if (editFace === true) {
+            if (faceFile === undefined && streaming === false) {
+                return "You have indicated you wish to edit your face but haven't uploaded a face file!"
+            } else if (streaming === false) {
+                const facePath = await uploadFiles(faceFile)
+                if (!facePath instanceof Array) { return "Failed to upload face file" }
+                params.append("face", facePath)
+            } else {
+                // Get & upload face picture if streaming
+                const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
+                if (!facePath instanceof Array) { return "Failed to upload screenshot from webcam" }
+                params.append("face", facePath)
+            }
         }
 
-        if (!lockNoFiles) {
+        if (lockNoFiles === false) {
             let lockPaths = await uploadFiles(Array.from(lockFiles))
             params.append("locks", lockPaths)
         }
 
-        if (!unlockNoFiles) {
+        if (unlockNoFiles === false) {
             let unlockPaths = await uploadFiles(Array.from(unlockFiles))
             params.append("unlocks", unlockPaths)
         }
@@ -119,6 +136,68 @@ export default function EditComponent({ username, authenticated }) {
         }
     }
 
+    function getFaceForm() {
+        if (streaming) {
+            if (editFace === true) {
+                return (
+                    <fieldset disabled>
+                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                            <Form.File
+                                id="face_file_form"
+                                type="file"
+                            >
+                                <Form.File.Label>Disable video permission to change your face using a file</Form.File.Label>
+                                <Form.File.Input />
+                            </Form.File>
+                        </Form.Group>
+                    </fieldset>
+                )
+            } else {
+                return (
+                    <fieldset disabled>
+                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                            <Form.File
+                                id="face_file_form"
+                                type="file"
+                            >
+                                <Form.File.Label><b>Enable Edit Face to change your stored face to the face in the webcam</b></Form.File.Label>
+                                <Form.File.Input />
+                            </Form.File>
+                        </Form.Group>
+                    </fieldset>
+                )
+            }
+        } else {
+            if (editFace === true) {
+                return (
+                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                        <Form.File
+                            id="face_file_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Face File</Form.File.Label>
+                            <Form.File.Input />
+                        </Form.File>
+                    </Form.Group>
+                )
+            } else {
+                return (
+                    <fieldset disabled>
+                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
+                            <Form.File
+                                id="face_file_form"
+                                type="file"
+                            >
+                                <Form.File.Label><b>Enable Edit Face to change your stored face</b></Form.File.Label>
+                                <Form.File.Input />
+                            </Form.File>
+                        </Form.Group>
+                    </fieldset>
+                )
+            }
+        }
+    }
+
     const handleLockChange = (files) => {
         setLockFiles(files)
         generateFileList(files, null)
@@ -153,44 +232,79 @@ export default function EditComponent({ username, authenticated }) {
     if (!authenticated) {
         window.location.href = "/"
     } else {
+        if (navigator.mediaDevices.getUserMedia !== null && editFace === true) {
+            navigator.getUserMedia({video:true},
+                function (stream) {
+                    setStreaming(true)
+                },
+                function (e) {
+                    setStreaming(false)
+                    if (e.name === "NotAllowedError") {
+                        console.log("Video perms denied")
+                        document.getElementById("video_display").hidden = true
+                    } else {
+                        console.log("background error : " + e.name)
+                    }
+                }
+            )
+        }
+
         return (
             <div className="edit-wrapper">
-                <h1>Please change which features you would like to edit</h1>
-                <Button variant="secondary" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
+                <h1 id="edit_header">Add new values for features you would like to edit</h1>
+                <Button id="back_button" variant="info" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
+                { editFace === true ? <Webcam
+                    id="video_display"
+                    audio={false}
+                    screenshotFormat="image/jpeg"
+                    ref={webcamRef}
+                /> : <p></p>}
                 <Form onSubmit={handleSubmit}>
-                        <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                            <Form.File
-                                id="face_file_form"
-                                type="file"
-                            >
-                                <Form.File.Label>Face</Form.File.Label>
-                                <Form.File.Input />
-                            </Form.File>
+                        {getFaceForm()}
+                        <Form.Group controlId="formBasicCheckbox">
+                            <Form.Check
+                                type="checkbox"
+                                label="Edit Face"
+                                defaultChecked={editFace}
+                                onChange={() => setEditFace(!editFace)}
+                            />
                         </Form.Group>
                         <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
                             <Form.File
                                 id="lock_gesture_form"
                                 type="file"
                             >
-                                <Form.File.Label>Chose at least 4 gestures as your new lock gesture combination</Form.File.Label>
+                                <Form.File.Label>Lock Gesture Combination</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
+                            <Form.Check
+                                type="checkbox"
+                                label="Show Lock Combination"
+                                defaultChecked={showLockDisplay}
+                                onChange={() => setShowLockDisplay(!showLockDisplay)}
+                            />
                         </Form.Group>
                         <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                             <Form.File
                                 id="unlock_gesture_form"
                                 type="file"
                             >
-                                <Form.File.Label>Chose at least 4 other gestures as your new unlock gesture combination</Form.File.Label>
+                                <Form.File.Label>Unlock Gesture Combination</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
+                            <Form.Check
+                                type="checkbox"
+                                label="Show Unlock Combination"
+                                defaultChecked={showUnlockDisplay}
+                                onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                            />
                         </Form.Group>
                         {getButton()}
                 </Form>
-                <ListGroup className="lock-display">
+                <ListGroup className="lock-display" hidden={showLockDisplay === true ? false : true}>
                     {lockDisplay}
                 </ListGroup>
-                <ListGroup className="unlock-display">
+                <ListGroup className="unlock-display" hidden={showUnlockDisplay === true ? false : true}>
                     {unlockDisplay}
                 </ListGroup>
             </div>

@@ -178,8 +178,8 @@ def awaitProject(start):
     :param start: Boolean denoting whether we are starting or stopping the project
     """
     if start:
-        delay = 20
-        maxAttempts = 50
+        delay = 30
+        maxAttempts = 60
         timeoutSeconds = delay * maxAttempts
 
         print(f"[INFO] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
@@ -200,7 +200,7 @@ def awaitProject(start):
             )
     else:
         # Stopping a model takes less time than starting one
-        stopTimeout = 150
+        stopTimeout = 200
         print(f"[INFO] Request to stop {os.getenv('GESTURE_RECOG_PROJECT_NAME')} model was successfully sent! Waiting {stopTimeout}s for the model to stop...")
         time.sleep(stopTimeout)
 
