@@ -21,7 +21,6 @@ export default function AuthenticateComponent({
 }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
-    const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [unlockFiles, setUnlockFiles] = useState()
     const [lockDisplay, setLockDisplay] = useState([
@@ -38,12 +37,8 @@ export default function AuthenticateComponent({
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
-        if ((faceFile === undefined || faceFile === null) && streaming === false) {
-            return "No face file was selected"
-        } else if (streaming === false) {
-            const facePath = await uploadFiles(faceFile)
-            if (!facePath instanceof Array) { return "Failed to upload face file" }
-            params.append("face", facePath)
+        if (streaming === false) {
+            return "Please enable video permissions in order to take a picture of your face"
         } else {
             // Get & upload face picture if streaming
             const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
@@ -89,12 +84,8 @@ export default function AuthenticateComponent({
         // Upload files (returning the error if something failed)
         let params = new FormData()
         params.append("user", username)
-        if ((faceFile === undefined || faceFile === null) && streaming === false) {
-            return "No face file was selected"
-        } else if (streaming === false) {
-            const facePath = await uploadFiles(faceFile)
-            if (!facePath instanceof Array) { return "Failed to upload face file" }
-            params.append("face", facePath)
+        if (streaming === false) {
+            return "Please enable video permissions in order to take a picture of your face"
         } else {
             // Get & upload face picture if streaming
             const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
@@ -212,41 +203,11 @@ export default function AuthenticateComponent({
         // Header changes depending on whether we are registering or logging in
         if (registering) {
             return (
-                <h2 id="authenticate_header">Hello {username}! Please enter or stream a face and upload your lock and unlock combinations to create an account</h2>
+                <h2 id="authenticate_header">Hello {username}! Please stream a face and upload your lock and unlock combinations to create an account</h2>
             )
         } else {
             return (
-                <h2 id="authenticate_header">Welcome back {username}. Please enter or stream your face and upload your unlock combination</h2>
-            )
-        }
-    }
-
-    function getFaceForm() {
-        if (streaming) {
-            return (
-                <fieldset disabled>
-                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                        <Form.File
-                            id="face_file_form"
-                            type="file"
-                        >
-                            <Form.File.Label>Disable video permission to authenticate your face using a file</Form.File.Label>
-                            <Form.File.Input />
-                        </Form.File>
-                    </Form.Group>
-                </fieldset>
-            )
-        } else {
-            return (
-                <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                    <Form.File
-                        id="face_file_form"
-                        type="file"
-                    >
-                        <Form.File.Label>Face File</Form.File.Label>
-                        <Form.File.Input />
-                    </Form.File>
-                </Form.Group>
+                <h2 id="authenticate_header">Welcome back {username}. Please stream your face and upload your unlock combination</h2>
             )
         }
     }
@@ -334,7 +295,7 @@ export default function AuthenticateComponent({
                         role="status"
                         aria-hidden="true"
                     />
-                    Working...
+                    Loading...
                 </Button>
             )
         } else {
@@ -377,7 +338,6 @@ export default function AuthenticateComponent({
                     <Button block id="back_button" variant="info" href="/" disabled={loading}>Back</Button>
                     <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
-                        {getFaceForm()}
                         {getGestureForms()}
                         {getButton()}
                     </Form>

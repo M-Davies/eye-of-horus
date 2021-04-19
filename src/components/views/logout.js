@@ -15,7 +15,6 @@ import '../../styles/logout.css'
 export default function LogoutComponent({ username, authenticated, setAuthenticated }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
-    const [faceFile, setFaceFile] = useState()
     const [lockFiles, setLockFiles] = useState()
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
@@ -59,45 +58,11 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         }
     }
 
-    function getFaceForm() {
-        if (streaming) {
-            return (
-                <fieldset disabled>
-                    <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                        <Form.File
-                            id="face_file_form"
-                            type="file"
-                        >
-                            <Form.File.Label>Disable video permission to authenticate your face using a file</Form.File.Label>
-                            <Form.File.Input />
-                        </Form.File>
-                    </Form.Group>
-                </fieldset>
-            )
-        } else {
-            return (
-                <Form.Group onChange={(e) => setFaceFile(e.target.files[0])}>
-                    <Form.File
-                        id="face_file_form"
-                        type="file"
-                    >
-                        <Form.File.Label>Face File</Form.File.Label>
-                        <Form.File.Input />
-                    </Form.File>
-                </Form.Group>
-            )
-        }
-    }
-
     async function logoutUser() {
         let params = new FormData()
         params.append("user", username)
-        if (faceFile === undefined && streaming === false) {
-            return "No face file was selected"
-        } else if (streaming === false) {
-            const facePath = await uploadFiles(faceFile)
-            if (!facePath instanceof Array) { return "Failed to upload face file" }
-            params.append("face", facePath)
+        if (streaming === false) {
+            return "Please enable video permissions in order to take a picture of your face"
         } else {
             // Get & upload face picture if streaming
             const facePath = await uploadEncoded(webcamRef.current.getScreenshot())
@@ -173,7 +138,6 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                     <Button id="back_button" variant="info" href="/dashboard" disabled={loading}>Back</Button>
                     <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
-                        {getFaceForm()}
                         <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
                             <Form.File
                                 id="lock_gesture_form"
