@@ -4,6 +4,7 @@ import AuthenticateComponent from './components/views/authenticate'
 import DashboardComponent from './components/views/dashboard'
 import EditComponent from './components/views/edit'
 import LogoutComponent from './components/views/logout'
+import ForgotComponent from './components/views/forgot'
 import { UsernameToken, UserExistsToken, AuthenticatedToken } from './components/token'
 
 import './styles/App.css'
@@ -66,6 +67,13 @@ export default function App() {
                         </Route>
                         <Route path="/logout">
                             <LogoutComponent
+                                username={username}
+                                authenticated={authenticated}
+                                setAuthenticated={setAuthenticated}
+                            />
+                        </Route>
+                        <Route path="/forgot">
+                            <ForgotComponent
                                 username={username}
                                 authenticated={authenticated}
                                 setAuthenticated={setAuthenticated}

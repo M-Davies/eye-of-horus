@@ -170,7 +170,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
             <div className="logout-wrapper">
                 <h1 id="logout_header">Select your face file and lock combination to log out</h1>
                 <div className="user-forms">
-                    <Button id="back_button" variant="info" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
+                    <Button id="back_button" variant="info" href="/dashboard" disabled={loading}>Back</Button>
                     <Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />
                     <Form onSubmit={handleSubmit}>
                         {getFaceForm()}
@@ -179,7 +179,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                                 id="lock_gesture_form"
                                 type="file"
                             >
-                                <Form.File.Label>Lock Combination</Form.File.Label>
+                                <Form.File.Label>Lock Combination (if you have forgotten it, <a href="/edit">edit it here</a>)</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
                             <Form.Check
@@ -202,7 +202,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                         </fieldset>
                         {getButton()}
                     </Form>
-                    <ListGroup className="lock-display" hidden={showLockDisplay === true ? false : true}>
+                    <ListGroup className="lock-display" hidden={!showLockDisplay}>
                         {lockDisplay}
                     </ListGroup>
                 </div>

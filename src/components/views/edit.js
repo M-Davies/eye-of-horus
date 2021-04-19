@@ -252,13 +252,15 @@ export default function EditComponent({ username, authenticated }) {
         return (
             <div className="edit-wrapper">
                 <h1 id="edit_header">Add new values for features you would like to edit</h1>
-                <Button id="back_button" variant="info" href="/dashboard" disabled={loading === true ? true : false}>Back</Button>
-                { editFace === true ? <Webcam
-                    id="video_display"
-                    audio={false}
-                    screenshotFormat="image/jpeg"
-                    ref={webcamRef}
-                /> : <p></p>}
+                <Button block id="back_button" variant="info" href="/dashboard" disabled={loading}>Back</Button>
+                { editFace === true &&
+                    <Webcam
+                        id="video_display"
+                        audio={false}
+                        screenshotFormat="image/jpeg"
+                        ref={webcamRef}
+                    />
+                }
                 <Form onSubmit={handleSubmit}>
                         {getFaceForm()}
                         <Form.Group controlId="formBasicCheckbox">
@@ -301,10 +303,10 @@ export default function EditComponent({ username, authenticated }) {
                         </Form.Group>
                         {getButton()}
                 </Form>
-                <ListGroup className="lock-display" hidden={showLockDisplay === true ? false : true}>
+                <ListGroup className="lock-display" hidden={!showLockDisplay}>
                     {lockDisplay}
                 </ListGroup>
-                <ListGroup className="unlock-display" hidden={showUnlockDisplay === true ? false : true}>
+                <ListGroup className="unlock-display" hidden={!showUnlockDisplay}>
                     {unlockDisplay}
                 </ListGroup>
             </div>
