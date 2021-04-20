@@ -37,7 +37,9 @@ load_dotenv()
 
 def delete_file(fileName):
     """delete_file() : Deletes a S3 object file
+
     :param fileName: S3 Path to file to be deleted
+
     :return: S3 file object path that was successfully deleted
     """
 
@@ -80,9 +82,13 @@ def delete_file(fileName):
 
 def upload_file(fileName, username, locktype=None, s3Name=None):
     """upload_file() : Uploads a file to an S3 bucket based off the input params entered.
+
     :param fileName: Path to file to be uploaded
+
     :param username: User to upload the new face details to
+
     :param s3Name: S3 object name and or path. If not specified then the filename is used
+
     :return: S3 object path to the uploaded object
     """
     # This is appended to an error messsage in case the user is creating an account and something goes wrong
@@ -149,7 +155,9 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
 
 def streamHandler(start, sleepTime=None):
     """streamHandler() : Starts or stops the live stream to AWS, sleeping after starting briefly to allow it to get situated. It will also check the error codes of the respective start and stop shell scripts to verify the stream actually started/stopped.
+
     :param start: Boolean denoting whether we are starting or stopping the stream
+
     :param sleepTime: Int for how long to sleep for after starting the stream
     """
     if start:
@@ -364,7 +372,9 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
 
 def parseArgs(args):
     """parseArgs() : Takes in a specific array or sys args as input and returns a well formatted argument dictionary
+
     :param args: Array of sys.argv to parse
+
     :return: A dictionary of args by name
     """
     global TIMEOUT_SECONDS

@@ -24,26 +24,40 @@ knVideo = boto3.client("kinesisvideo")
 
 
 def compareFaces(localImage, username):
-    with open(localImage, "rb") as fileBytes:
-        return rekog.compare_faces(
-            SourceImage={
-                'Bytes': fileBytes.read(),
-            },
-            TargetImage={
-                'S3Object': {
-                    'Bucket': os.getenv('FACE_RECOG_BUCKET'),
-                    'Name': f"users/{username}/{username}.jpg"
-                }
-            },
-            SimilarityThreshold=95,
-            QualityFilter='AUTO'
-        )
+    """
+    compareFaces() : Compares a locally stored image (or captured stream frame) with a user's stored S3 face
+
+    :param localImage: Full path to source image
+
+    :param username: User to retrieve the target image for
+
+    :return: Empty FaceMatches list if no face was found, face comparison details otherwise
+    """
+    try:
+        with open(localImage, "rb") as fileBytes:
+            return rekog.compare_faces(
+                SourceImage={
+                    'Bytes': fileBytes.read(),
+                },
+                TargetImage={
+                    'S3Object': {
+                        'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                        'Name': f"users/{username}/{username}.jpg"
+                    }
+                },
+                SimilarityThreshold=95,
+                QualityFilter='AUTO'
+            )
+    except rekog.exceptions.InvalidParameterException:
+        return {"FaceMatches": []}
 
 
 def examineFace(record):
     """
     examineFace() : Decode and parse the shard bytes to extract a high matching face object. Once found, verify it is a real face by comparing the landmarks
+
     :param record: Shard containing frames and fragment numbers
+
     :return: The matched face object with the highest similarity to the detected face or None if it is not a real face or no matches were found
     """
     jsonData = json.loads(record["Data"])
@@ -56,36 +70,58 @@ def examineFace(record):
 
     # If only one matched face was found, use that.
     if len(matchedFaces) == 1:
-        sourceLandmarks = jsonData["FaceSearchResponse"][0]["Landmarks"]
+
+        # Verify face is similar enough
+        if matchedFaces[0]["Similarity"] < 95:
+            return None
+
+        # Verify face is not a presentation attack
+        sourceLandmarks = jsonData["FaceSearchResponse"][0]["DetectedFace"]["Landmarks"]
         try:
-            username = matchedFaces[0]['ExternalImageId'].split('.jpg')[0]
-        except:
-            username = matchedFaces[0]['ExternalImageId'].split('.png')[0]
-        targetLandmarks = rekog.detect_faces(
-            Image={'S3Object': {
-                'Bucket': os.getenv('FACE_RECOG_BUCKET'),
-                'Name': f"users/{username}/{username}.jpg"
-            }}
-        )["FaceDetails"][0]["Landmarks"]
+            username = matchedFaces[0]['Face']['ExternalImageId'].split('.jpg')[0]
+        except Exception:
+            username = matchedFaces[0]['Face']['ExternalImageId'].split('.png')[0]
+
+        try:
+            targetLandmarks = rekog.detect_faces(
+                Image={'S3Object': {
+                    'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                    'Name': f"users/{username}/{username}.jpg"
+                }}
+            )["FaceDetails"][0]["Landmarks"]
+        except botocore.exceptions.HTTPClientError:
+            # Special case as when the signal handler cancels the script during a net request, it will raise this exception
+            raise TimeoutError
+
         if checkPresentationAttack(sourceLandmarks, targetLandmarks, username) is False:
             return matchedFaces[0]
         else:
             return None
     # Find the greatest confident face if there is more than one
     elif len(matchedFaces) > 1:
+        # Verify top face is similar enough
         matchedFace = max(matchedFaces, key=lambda ev: ev["Similarity"])
+        if matchedFace["Similarity"] < 95:
+            return None
 
-        sourceLandmarks = jsonData["FaceSearchResponse"][0]["Landmarks"]
+        # Verify top face is not a presentation attack
+        sourceLandmarks = jsonData["FaceSearchResponse"][0]["DetectedFace"]["Landmarks"]
         try:
-            username = matchedFace['ExternalImageId'].split('.jpg')[0]
-        except:
-            username = matchedFace['ExternalImageId'].split('.png')[0]
-        targetLandmarks = rekog.detect_faces(
-            Image={'S3Object': {
-                'Bucket': os.getenv('FACE_RECOG_BUCKET'),
-                'Name': f"users/{username}/{username}.jpg"
-            }}
-        )["FaceDetails"][0]["Landmarks"]
+            username = matchedFace['Face']['ExternalImageId'].split('.jpg')[0]
+        except Exception:
+            username = matchedFace['Face']['ExternalImageId'].split('.png')[0]
+
+        try:
+            targetLandmarks = rekog.detect_faces(
+                Image={'S3Object': {
+                    'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                    'Name': f"users/{username}/{username}.jpg"
+                }}
+            )["FaceDetails"][0]["Landmarks"]
+        except botocore.exceptions.HTTPClientError:
+            # Special case as when the signal handler cancels the script during a net request, it will raise this exception
+            raise TimeoutError
+
         if checkPresentationAttack(sourceLandmarks, targetLandmarks, username) is False:
             return matchedFace
         else:
@@ -97,10 +133,10 @@ def examineFace(record):
 
 def createShardIterator(shardId):
     """
-    createShardIterator() : Creates an interator that will allow searching through the shards. This will be called multiple times as shard iterators usually expire after 5mins
+    createShardIterator() : Creates an interator that will allow searching through the shards. This will be called multiple times as shard iterators usually expire after 5mins. See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kinesis.html#Kinesis.Client.get_shard_iterator
 
-    See https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/kinesis.html#Kinesis.Client.get_shard_iterator
     :param shardId: ID of the shard to create an iterator for
+
     :return: The shard iterator ID
     """
     return kinesis.get_shard_iterator(
@@ -112,28 +148,48 @@ def createShardIterator(shardId):
 
 def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
     """checkPresentationAttack() : Takes in two landmarks arrays and compares the key features to see if they are close enough to confirm the application is not being subjected to a presentation attack
+
     :param sourceLandmarks: Array of landmarks from the source image
+
     :param targetLandmarks: Array of landmarks from the target image
+
     :param user: User that is attempting to authenticate
+
     :return: True if an attack is occurring, false otherwise
     """
+    attack = False
     for landmarkEntry in ["eyeLeft", "eyeRight", "nose", "mouthLeft", "mouthRight"]:
+        print(f"New landmark : {landmarkEntry}")
         # Get matching landmark in source and target
         sourceMark = next((item for item in sourceLandmarks if item['Type'] == landmarkEntry), None)
-        if sourceMark is None: return True
+        if sourceMark is None:
+            attack = True
+            break
         targetMark = next((item for item in targetLandmarks if item['Type'] == landmarkEntry), None)
 
         # Compare the positions of each within a certain threshold, fail if they are not within it
-        if abs(round(sourceMark["X"], 2) - round(targetMark["X"], 2)) <= 0.1 is False or abs(round(sourceMark["Y"], 2) - round(targetMark["Y"], 2)) <= 0.1 is False:
-            return True
+        xDiff = abs(round(sourceMark["X"], 2) - round(targetMark["X"], 2))
+        yDiff = abs(round(sourceMark["Y"], 2) - round(targetMark["Y"], 2))
+        print(round(sourceMark["X"], 2))
+        print(round(targetMark["X"], 2))
+        print(round(sourceMark["Y"], 2))
+        print(round(targetMark["Y"], 2))
+        print("DIFFS")
+        print(xDiff)
+        print(yDiff)
+        if ((xDiff <= 0.07) is False) or ((yDiff <= 0.07) is False):  # noqa: E712
+            attack = True
+            break
 
-    return False
+    return attack
 
 
 def examineShard(shardJson):
     """
     examineShard() : Iterates through the latest shards obtained from the stream, retrieving the matched faces data for each shard
+
     :param shardJson: Details of the shard
+
     :return: The face that closest matches the detected face in the stream
     """
     iterator = createShardIterator(shardJson["ShardId"])

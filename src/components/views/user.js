@@ -46,20 +46,24 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
         ClearTokens()
 
         // Check if the user exists and redirect the relevant page depending on the server result
-        setUsername(username)
-        setLoading(true)
-        let exists = await userExists(username)
-        if (!userExists instanceof Boolean) {
-            alert(`SERVER ERROR\n${exists}`)
-            window.location.href = "/"
-        }
-        setLoading(false)
-        setUserExists(exists)
-
-        if (exists === true) {
-            window.location.href = "/login"
+        if (!username) {
+            alert("Please provide a username")
         } else {
-            window.location.href = "/register"
+            setUsername(username)
+            setLoading(true)
+            let exists = await userExists(username)
+            if (!userExists instanceof Boolean) {
+                alert(`SERVER ERROR\n${exists}`)
+                window.location.href = "/"
+            }
+            setLoading(false)
+            setUserExists(exists)
+
+            if (exists === true) {
+                window.location.href = "/login"
+            } else {
+                window.location.href = "/register"
+            }
         }
     }
 
