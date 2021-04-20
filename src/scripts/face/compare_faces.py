@@ -35,16 +35,16 @@ def compareFaces(localImage, username):
                     'Name': f"users/{username}/{username}.jpg"
                 }
             },
-            SimilarityThreshold=90,
+            SimilarityThreshold=95,
             QualityFilter='AUTO'
         )
 
 
 def examineFace(record):
     """
-    examineFace() : Decode and parse the shard bytes to extract a high matching face object
+    examineFace() : Decode and parse the shard bytes to extract a high matching face object. Once found, verify it is a real face by comparing the landmarks
     :param record: Shard containing frames and fragment numbers
-    :return: The matched face object with the highest similarity to the detected face
+    :return: The matched face object with the highest similarity to the detected face or None if it is not a real face or no matches were found
     """
     jsonData = json.loads(record["Data"])
     matchedFaces = None
@@ -56,10 +56,40 @@ def examineFace(record):
 
     # If only one matched face was found, use that.
     if len(matchedFaces) == 1:
-        return matchedFaces[0]
+        sourceLandmarks = jsonData["FaceSearchResponse"][0]["Landmarks"]
+        try:
+            username = matchedFaces[0]['ExternalImageId'].split('.jpg')[0]
+        except:
+            username = matchedFaces[0]['ExternalImageId'].split('.png')[0]
+        targetLandmarks = rekog.detect_faces(
+            Image={'S3Object': {
+                'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                'Name': f"users/{username}/{username}.jpg"
+            }}
+        )["FaceDetails"][0]["Landmarks"]
+        if checkPresentationAttack(sourceLandmarks, targetLandmarks, username) is False:
+            return matchedFaces[0]
+        else:
+            return None
     # Find the greatest confident face if there is more than one
     elif len(matchedFaces) > 1:
-        return max(matchedFaces, key=lambda ev: ev["Similarity"])
+        matchedFace = max(matchedFaces, key=lambda ev: ev["Similarity"])
+
+        sourceLandmarks = jsonData["FaceSearchResponse"][0]["Landmarks"]
+        try:
+            username = matchedFace['ExternalImageId'].split('.jpg')[0]
+        except:
+            username = matchedFace['ExternalImageId'].split('.png')[0]
+        targetLandmarks = rekog.detect_faces(
+            Image={'S3Object': {
+                'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                'Name': f"users/{username}/{username}.jpg"
+            }}
+        )["FaceDetails"][0]["Landmarks"]
+        if checkPresentationAttack(sourceLandmarks, targetLandmarks, username) is False:
+            return matchedFace
+        else:
+            return None
     # Just return nothing if no faces were found
     else:
         return None
@@ -78,6 +108,26 @@ def createShardIterator(shardId):
         ShardId=shardId,
         ShardIteratorType="LATEST"
     )["ShardIterator"]
+
+
+def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
+    """checkPresentationAttack() : Takes in two landmarks arrays and compares the key features to see if they are close enough to confirm the application is not being subjected to a presentation attack
+    :param sourceLandmarks: Array of landmarks from the source image
+    :param targetLandmarks: Array of landmarks from the target image
+    :param user: User that is attempting to authenticate
+    :return: True if an attack is occurring, false otherwise
+    """
+    for landmarkEntry in ["eyeLeft", "eyeRight", "nose", "mouthLeft", "mouthRight"]:
+        # Get matching landmark in source and target
+        sourceMark = next((item for item in sourceLandmarks if item['Type'] == landmarkEntry), None)
+        if sourceMark is None: return True
+        targetMark = next((item for item in targetLandmarks if item['Type'] == landmarkEntry), None)
+
+        # Compare the positions of each within a certain threshold, fail if they are not within it
+        if abs(round(sourceMark["X"], 2) - round(targetMark["X"], 2)) <= 0.1 is False or abs(round(sourceMark["Y"], 2) - round(targetMark["Y"], 2)) <= 0.1 is False:
+            return True
+
+    return False
 
 
 def examineShard(shardJson):
@@ -154,7 +204,7 @@ def checkForFaces():
             Settings={
                 "FaceSearch": {
                     "CollectionId": os.getenv('FACE_RECOG_COLLECTION'),
-                    "FaceMatchThreshold": 90
+                    "FaceMatchThreshold": 95
                 }
             },
             RoleArn=os.getenv("ROLE_ARN")

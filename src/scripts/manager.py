@@ -726,11 +726,29 @@ def main(parsedArgs=None):
             print(f"[INFO] Running facial comparison library to compare {argDict.face} against the stored face for {argDict.profile}")
             faceCompare = compare_faces.compareFaces(argDict.face, argDict.profile)
             if faceCompare["FaceMatches"] is not [] and len(faceCompare["FaceMatches"]) == 1:
-                return commons.respond(
-                    messageType="SUCCESS",
-                    message=f"Input face {argDict.face} matched successfully with stored user's {argDict.profile} face",
-                    code=0
-                )
+
+                # Check if face is a presentation attack by checking details are close enough
+                sourceLandmarks = faceCompare["FaceMatches"][0]["Face"]["Landmarks"]
+                targetLandmarks = rekogClient.detect_faces(
+                    Image={'S3Object': {
+                        'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                        'Name': f"users/{argDict.profile}/{argDict.profile}.jpg"
+                    }}
+                )["FaceDetails"][0]["Landmarks"]
+
+                if compare_faces.checkPresentationAttack(sourceLandmarks, targetLandmarks, argDict.profile) is False:
+                    return commons.respond(
+                        messageType="SUCCESS",
+                        message=f"Input face {argDict.face} matched successfully with stored user's {argDict.profile} face",
+                        code=0
+                    )
+                else:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"Input face {argDict.face} does not match stored user's {argDict.profile} face, try adjusting your camera's viewpoint so it more closely matches your profile's stored face",
+                        code=10
+                    )
+
             else:
                 return commons.respond(
                     messageType="ERROR",
