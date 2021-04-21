@@ -95,7 +95,7 @@ def checkForGestures(image):
     :param image: Locally stored image OR image bytes OR stream frame to scan for authentication gestures
     :return: JSON object containing the gesture with the highest confidence OR None if no recognised gesture was found
     """
-    confidence = 85
+    confidence = 95
     arn = os.getenv("LATEST_MODEL_ARN")
 
     # The param given is a local image file

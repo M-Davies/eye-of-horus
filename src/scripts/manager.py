@@ -37,7 +37,9 @@ load_dotenv()
 
 def delete_file(fileName):
     """delete_file() : Deletes a S3 object file
+
     :param fileName: S3 Path to file to be deleted
+
     :return: S3 file object path that was successfully deleted
     """
 
@@ -80,9 +82,13 @@ def delete_file(fileName):
 
 def upload_file(fileName, username, locktype=None, s3Name=None):
     """upload_file() : Uploads a file to an S3 bucket based off the input params entered.
+
     :param fileName: Path to file to be uploaded
+
     :param username: User to upload the new face details to
+
     :param s3Name: S3 object name and or path. If not specified then the filename is used
+
     :return: S3 object path to the uploaded object
     """
     # This is appended to an error messsage in case the user is creating an account and something goes wrong
@@ -149,7 +155,9 @@ def upload_file(fileName, username, locktype=None, s3Name=None):
 
 def streamHandler(start, sleepTime=None):
     """streamHandler() : Starts or stops the live stream to AWS, sleeping after starting briefly to allow it to get situated. It will also check the error codes of the respective start and stop shell scripts to verify the stream actually started/stopped.
+
     :param start: Boolean denoting whether we are starting or stopping the stream
+
     :param sleepTime: Int for how long to sleep for after starting the stream
     """
     if start:
@@ -364,7 +372,9 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
 
 def parseArgs(args):
     """parseArgs() : Takes in a specific array or sys args as input and returns a well formatted argument dictionary
+
     :param args: Array of sys.argv to parse
+
     :return: A dictionary of args by name
     """
     global TIMEOUT_SECONDS
@@ -726,11 +736,33 @@ def main(parsedArgs=None):
             print(f"[INFO] Running facial comparison library to compare {argDict.face} against the stored face for {argDict.profile}")
             faceCompare = compare_faces.compareFaces(argDict.face, argDict.profile)
             if faceCompare["FaceMatches"] is not [] and len(faceCompare["FaceMatches"]) == 1:
-                return commons.respond(
-                    messageType="SUCCESS",
-                    message=f"Input face {argDict.face} matched successfully with stored user's {argDict.profile} face",
-                    code=0
-                )
+
+                # Get source landmarks
+                with open(argDict.face, "rb") as fileBytes:
+                    sourceFaceAttr = rekogClient.detect_faces(Image={"Bytes": fileBytes.read()})
+
+                # Check if face is a presentation attack by checking details are close enough
+                sourceLandmarks = sourceFaceAttr["FaceDetails"][0]["Landmarks"]
+                targetLandmarks = rekogClient.detect_faces(
+                    Image={'S3Object': {
+                        'Bucket': os.getenv('FACE_RECOG_BUCKET'),
+                        'Name': f"users/{argDict.profile}/{argDict.profile}.jpg"
+                    }}
+                )["FaceDetails"][0]["Landmarks"]
+
+                if compare_faces.checkPresentationAttack(sourceLandmarks, targetLandmarks, argDict.profile) is False:
+                    return commons.respond(
+                        messageType="SUCCESS",
+                        message=f"Input face {argDict.face} matched successfully with stored user's {argDict.profile} face",
+                        code=0
+                    )
+                else:
+                    return commons.respond(
+                        messageType="ERROR",
+                        message=f"Input face {argDict.face} does not match stored user's {argDict.profile} face, try adjusting your camera's viewpoint so it more closely matches your profile's stored face",
+                        code=10
+                    )
+
             else:
                 return commons.respond(
                     messageType="ERROR",

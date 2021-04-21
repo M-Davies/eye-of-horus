@@ -160,7 +160,7 @@ export default function AuthenticateComponent({
                 window.location.href = "/dashboard"
             } else if (userLoginRes.CODE === 10) {
                 setAuthenticated(false)
-                alert("Failed to login with given face or unlock credentials")
+                alert(`Failed to login with given face or unlock credentials\n${userLoginRes.MESSAGE}`)
                 window.location.href = "/login"
             } else {
                 // If unsuccessful, return to default login with error alert
