@@ -53,7 +53,7 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
             setLoading(true)
             let exists = await userExists(username)
             setLoading(false)
-            if (userExists instanceof Boolean === false) {
+            if (!userExists instanceof Boolean) {
                 alert(exists)
                 window.location.href = "/"
             } else {
