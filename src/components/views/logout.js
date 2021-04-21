@@ -87,7 +87,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in authenticating user, please try again later"
                 }
             })
     }

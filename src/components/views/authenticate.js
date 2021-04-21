@@ -75,7 +75,7 @@ export default function AuthenticateComponent({
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in user creation, please try again later"
                 }
             })
     }
@@ -111,7 +111,7 @@ export default function AuthenticateComponent({
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in user authentication, please try again later"
                 }
             })
     }

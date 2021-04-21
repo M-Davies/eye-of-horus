@@ -60,7 +60,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in checking user face, please try again later"
                 }
             })
     }
@@ -143,7 +143,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in authenticating user, please try again later"
                 }
             })
     }

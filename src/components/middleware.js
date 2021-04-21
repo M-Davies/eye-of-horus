@@ -12,7 +12,7 @@ export function uploadEncoded(encoded) {
             try {
                 return error.response.data
             } catch (err) {
-                throw new Error(error.toString())
+                return "Server error in uploading screenshot, please try again later"
             }
         })
 }
@@ -40,7 +40,7 @@ export function uploadFiles(files) {
             try {
                 return error.response.data
             } catch (err) {
-                throw new Error(error.toString())
+                return "Server error in uploading files, please try again later"
             }
         })
 }

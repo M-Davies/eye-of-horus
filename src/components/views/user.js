@@ -18,21 +18,21 @@ async function userExists(username) {
             'user': username
         })
     })
-    .then(data => data.json())
-    .then(data => {
-        if (data === true) {
-            return true
-        } else {
-            return false
-        }
-    })
-    .catch(function (error) {
-        try {
-            return error.response.data
-        } catch (err) {
-            throw new Error(error.toString())
-        }
-    })
+        .then(data => data.json())
+        .then(data => {
+            if (data === true) {
+                return true
+            } else {
+                return false
+            }
+        })
+        .catch(function (error) {
+            try {
+                return error.response.data
+            } catch (err) {
+                return "Server error in checking if user exists, please try again later"
+            }
+        })
 }
 
 export default function UserComponent({ setUsername, setUserExists, authenticated }) {
@@ -52,17 +52,18 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
             setUsername(username)
             setLoading(true)
             let exists = await userExists(username)
-            if (!userExists instanceof Boolean) {
-                alert(`SERVER ERROR\n${exists}`)
-                window.location.href = "/"
-            }
             setLoading(false)
-            setUserExists(exists)
-
-            if (exists === true) {
-                window.location.href = "/login"
+            if (userExists instanceof Boolean === false) {
+                alert(exists)
+                window.location.href = "/"
             } else {
-                window.location.href = "/register"
+                setUserExists(exists)
+
+                if (exists === true) {
+                    window.location.href = "/login"
+                } else {
+                    window.location.href = "/register"
+                }
             }
         }
     }

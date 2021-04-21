@@ -43,10 +43,10 @@ export default function DashboardComponent({ username, authenticated }) {
                         } else {
                             alert(`${responseData.TYPE}\n${responseData.MESSAGE}`)
                         }
-                        window.location.href = "/dashboard"
                     } else {
-                        throw new Error(error.toString())
+                        alert("Server error in user deletion, please try again later")
                     }
+                    window.location.href = "/dashboard"
                 })
         }
     }

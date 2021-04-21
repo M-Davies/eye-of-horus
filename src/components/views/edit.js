@@ -79,7 +79,7 @@ export default function EditComponent({ username, authenticated }) {
                 if (error.response.data) {
                     return error.response.data
                 } else {
-                    throw new Error(error.toString())
+                    return "Server error in editing user, please try again later"
                 }
             })
     }
