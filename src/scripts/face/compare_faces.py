@@ -168,16 +168,9 @@ def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
         targetMark = next((item for item in targetLandmarks if item['Type'] == landmarkEntry), None)
 
         # Compare the positions of each within a certain threshold, fail if they are not within it
-        xDiff = abs(round(sourceMark["X"], 2) - round(targetMark["X"], 2))
-        yDiff = abs(round(sourceMark["Y"], 2) - round(targetMark["Y"], 2))
-        print(round(sourceMark["X"], 2))
-        print(round(targetMark["X"], 2))
-        print(round(sourceMark["Y"], 2))
-        print(round(targetMark["Y"], 2))
-        print("DIFFS")
-        print(xDiff)
-        print(yDiff)
-        if ((xDiff <= 0.07) is False) or ((yDiff <= 0.07) is False):  # noqa: E712
+        xDiff = abs(round(sourceMark["X"], 3) - round(targetMark["X"], 3))
+        yDiff = abs(round(sourceMark["Y"], 3) - round(targetMark["Y"], 3))
+        if ((xDiff <= 0.05) is False) or ((yDiff <= 0.05) is False):  # noqa: E712
             attack = True
             break
 

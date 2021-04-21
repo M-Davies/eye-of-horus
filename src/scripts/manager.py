@@ -737,8 +737,12 @@ def main(parsedArgs=None):
             faceCompare = compare_faces.compareFaces(argDict.face, argDict.profile)
             if faceCompare["FaceMatches"] is not [] and len(faceCompare["FaceMatches"]) == 1:
 
+                # Get source landmarks
+                with open(argDict.face, "rb") as fileBytes:
+                    sourceFaceAttr = rekogClient.detect_faces(Image={"Bytes": fileBytes.read()})
+
                 # Check if face is a presentation attack by checking details are close enough
-                sourceLandmarks = faceCompare["FaceMatches"][0]["Face"]["Landmarks"]
+                sourceLandmarks = sourceFaceAttr["FaceDetails"][0]["Landmarks"]
                 targetLandmarks = rekogClient.detect_faces(
                     Image={'S3Object': {
                         'Bucket': os.getenv('FACE_RECOG_BUCKET'),
