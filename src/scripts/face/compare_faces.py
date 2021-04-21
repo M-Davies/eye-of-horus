@@ -159,7 +159,6 @@ def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
     """
     attack = False
     for landmarkEntry in ["eyeLeft", "eyeRight", "nose", "mouthLeft", "mouthRight"]:
-        print(f"New landmark : {landmarkEntry}")
         # Get matching landmark in source and target
         sourceMark = next((item for item in sourceLandmarks if item['Type'] == landmarkEntry), None)
         if sourceMark is None:
@@ -170,7 +169,7 @@ def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
         # Compare the positions of each within a certain threshold, fail if they are not within it
         xDiff = abs(round(sourceMark["X"], 3) - round(targetMark["X"], 3))
         yDiff = abs(round(sourceMark["Y"], 3) - round(targetMark["Y"], 3))
-        if ((xDiff <= 0.05) is False) or ((yDiff <= 0.05) is False):  # noqa: E712
+        if ((xDiff <= 0.07) is False) or ((yDiff <= 0.07) is False):  # noqa: E712
             attack = True
             break
 
