@@ -13,14 +13,26 @@ A face and gesture recognition authentication system, the eye of horus is my Fin
 
 ## Table of Contents
 
+- [Vision](#Vision)
 - [Components](#Components)
     - [Website](#Website)
     - [Python](#Python)
 - [Installation](#Installation)
     - [Architecture](#Architecture)
     - [Method](#Method)
-- [Vision](#Vision)
 - [Management](#Management)
+
+## Vision
+
+**For:** Users looking to protect their assets within safes or rooms and need a more reliable and secure solution than an easily stolen key or forgetful passphrase.
+
+**Whose:** Problem of those who forget their forms of authentication or wish for only a single group of authorised people access to an asset.
+
+**The**: Eye of Horus.
+
+**Is A**: Facial and gesture recognition authentication system.
+
+**That**: Combines two common biometric security features into one camera. It provides a secure, helpful authorisation system into a room, safe, house, you name it! Without the need to remember keys or passphrases, this camera uses facial recognition to recognise you as an authorised party to the asset as well as gesture recognition to accept a premade unlock pattern. To lock again, simply exit the asset and commit your locking gesture while looking up at the camera, exactly the same as what you’ve already done! Forgot either gesture? No problem! Simply recover your gesture with a good picture of yourself or another combination to reset your gesture there and then so you can make a new one!
 
 ## Components
 
@@ -32,9 +44,13 @@ This project consists of two major components. Those wishing to use the features
 
 This is a simple ReactJS frontend, NodeJS backend website used to showcase how to this application could work in a production environment. The website server utilises the python library to handle most of the work, just parsing and returning the responses, but could be a full blown recognition server too if setup appropriately.
 
+Tests are directory based, meaning there is one [folder](src/tests) for running all backend and frontend tests against the website using Jest. To run the tests, execute `npm run jstest` from repository root.
+
 ### Python
 
 This is a collection of python and shell scripts that handle, parse and execute queries and responses to and from the various AWS services listed above. After each action, a `response.json` file is produced that details what happened during the action. Check out the `README.md` at [src/scripts](src/scripts) for more information.
+
+Tests are directory based, meaning there is one [folder](src/scripts) for running all backend and frontend tests against the website using pytest. To run the tests, execute `npm run pytest` from repository root (they will take some time due to the custom labels project having to boot up and shutdown after use).
 
 ## Installation
 
@@ -79,18 +95,6 @@ python src/scripts/gesture/gesture_recog.py -a start
     - Open a separate terminal window. Execute `npm run start` and wait for the message `Compiled successfully!`. Finally, navigate to `http://localhost:3000/` in Chrome to view the frontend of the website.
 
 7. After you have finished development or investigation, please ensure to run `python src/scripts/gesture/gesture_recog.py -a stop` to stop the custom labels project. Failing to do so will result in additional financial charges as you are billed while it is in "active" state. For more information, see [Inference Hours](https://aws.amazon.com/rekognition/pricing/).
-
-## Vision
-
-**For:** Users looking to protect their assets within safes or rooms and need a more reliable and secure solution than an easily stolen key or forgetful passphrase.
-
-**Whose:** Problem of those who forget their forms of authentication or wish for only a single group of authorised people access to an asset.
-
-**The**: Eye of Horus.
-
-**Is A**: Facial and gesture recognition authentication system.
-
-**That**: Combines two common biometric security features into one camera. It provides a secure, helpful authorisation system into a room, safe, house, you name it! Without the need to remember keys or passphrases, this camera uses facial recognition to recognise you as an authorised party to the asset as well as gesture recognition to accept a premade unlock pattern. To lock again, simply exit the asset and commit your locking gesture while looking up at the camera, exactly the same as what you’ve already done! Forgot either gesture? No problem! Simply recover your gesture with a good picture of yourself or another combination to reset your gesture there and then so you can make a new one!
 
 ## Management
 
