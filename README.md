@@ -93,6 +93,7 @@ python src/scripts/gesture/gesture_recog.py -a start
 6. You're good to go! The python scripts are now ready to use. To use the website:
     - Start the backend nodejs server. From [src/server](src/server), execute `npm run start`
     - Open a separate terminal window. Execute `npm run start` and wait for the message `Compiled successfully!`. Finally, navigate to `http://localhost:3000/` in Chrome to view the frontend of the website.
+    - Inside the website, you will be presented with the home page where you will need to enter a username for a new or existing account (the system will automatically detect which is which). Username's must be alphanumeric.
 
 7. After you have finished development or investigation, please ensure to run `python src/scripts/gesture/gesture_recog.py -a stop` to stop the custom labels project. Failing to do so will result in additional financial charges as you are billed while it is in "active" state. For more information, see [Inference Hours](https://aws.amazon.com/rekognition/pricing/).
 

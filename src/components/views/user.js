@@ -48,6 +48,8 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
         // Check if the user exists and redirect the relevant page depending on the server result
         if (!username) {
             alert("Please provide a username")
+        } else if (username.match(/\W/)) {
+            alert("Username must consist of only number and letter characters")
         } else {
             setUsername(username)
             setLoading(true)

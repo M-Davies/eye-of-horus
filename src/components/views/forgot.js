@@ -246,7 +246,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
 }
 
 ForgotComponent.propTypes = {
-    username: PropTypes.string.isRequired,
+    username: PropTypes.string,
     authenticated: PropTypes.bool,
     setAuthenticated: PropTypes.func.isRequired
 }
