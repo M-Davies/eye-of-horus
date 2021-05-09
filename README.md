@@ -60,7 +60,7 @@ Everything on this project was built inside a Mac Catalina (and then Big Sur) op
 
 However, all of the software used does work on Windows and Linux and it should be possible to adapt your approach accordingly. Please contact the author if you need assistance on the matter.
 
-Your device must also have a camera and should be using the latest version Google Chrome for the website (not needed for the python library).
+Your device should also be using the latest version Google Chrome for the website (not needed for the python library) and must have a camera (any webcamera should do).
 
 ### Method
 
