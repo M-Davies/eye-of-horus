@@ -7,14 +7,15 @@ import Spinner from 'react-bootstrap/Spinner'
 import PropTypes from 'prop-types'
 import Webcam from 'react-webcam'
 
-import { uploadFiles, uploadEncoded } from '../middleware'
+import { uploadFiles, uploadEncoded, checkCombination } from '../middleware'
 
 export default function EditComponent({ username, authenticated }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
     const [editFace, setEditFace] = useState(false)
-    const [lockFiles, setLockFiles] = useState()
-    const [unlockFiles, setUnlockFiles] = useState()
+    const [lockFiles, setLockFiles] = useState({})
+    const [deleteLockFiles, setDeleteLockFiles] = useState()
+    const [unlockFiles, setUnlockFiles] = useState({})
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="lock-placeholder">Lock gesture combination unchanged</ListGroup.Item>
     ])
@@ -39,7 +40,7 @@ export default function EditComponent({ username, authenticated }) {
             unlockNoFiles = true
         }
 
-        if (editFace === false && lockNoFiles && unlockNoFiles) {
+        if (editFace === false && deleteLockFiles === false && lockNoFiles === true && unlockNoFiles === true) {
             return "Nothing selected to edit!"
         }
 
@@ -57,13 +58,40 @@ export default function EditComponent({ username, authenticated }) {
             }
         }
 
-        if (lockNoFiles === false) {
+        // User can either delete their combination OR alter it OR leave it as unchanged
+        if (deleteLockFiles === true) {
+            params.append("delete", true)
+        } else if (lockNoFiles === false) {
             let lockPaths = await uploadFiles(Array.from(lockFiles))
+            const identifiedGestures = await checkCombination(lockPaths)
+            if (identifiedGestures instanceof Array) {
+                if (identifiedGestures.includes("UNKNOWN")) {
+                    return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+                } else {
+                    if (!window.confirm(`Identified your lock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                        return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                    }
+                }
+            } else {
+                return "Failed to query server on gestures given, please try again later"
+            }
             params.append("locks", lockPaths)
         }
 
         if (unlockNoFiles === false) {
             let unlockPaths = await uploadFiles(Array.from(unlockFiles))
+            const identifiedGestures = await checkCombination(unlockPaths)
+            if (identifiedGestures instanceof Array) {
+                if (identifiedGestures.includes("UNKNOWN")) {
+                    return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+                } else {
+                    if (!window.confirm(`Identified your unlock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                        return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                    }
+                }
+            } else {
+                return "Failed to query server on gestures given, please try again later"
+            }
             params.append("unlocks", unlockPaths)
         }
 
@@ -76,9 +104,9 @@ export default function EditComponent({ username, authenticated }) {
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in editing user, please try again later"
                 }
             })
@@ -131,6 +159,48 @@ export default function EditComponent({ username, authenticated }) {
         }
     }
 
+    function getLockInputs() {
+        if (deleteLockFiles) {
+            return (
+                <fieldset disabled>
+                    <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
+                        <Form.File
+                            id="lock_gesture_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Lock Gesture Combination</Form.File.Label>
+                            <Form.File.Input multiple/>
+                        </Form.File>
+                        <Form.Check
+                            type="checkbox"
+                            label="Show Lock Combination"
+                            defaultChecked={false}
+                            onChange={() => setShowLockDisplay(!showLockDisplay)}
+                        />
+                    </Form.Group>
+                </fieldset>
+            )
+        } else {
+            return (
+                <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
+                    <Form.File
+                        id="lock_gesture_form"
+                        type="file"
+                    >
+                        <Form.File.Label>Lock Gesture Combination</Form.File.Label>
+                        <Form.File.Input multiple/>
+                    </Form.File>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Lock Combination"
+                        defaultChecked={showLockDisplay}
+                        onChange={() => setShowLockDisplay(!showLockDisplay)}
+                    />
+                </Form.Group>
+            )
+        }
+    }
+
     const handleLockChange = (files) => {
         setLockFiles(files)
         generateFileList(files, null)
@@ -173,10 +243,7 @@ export default function EditComponent({ username, authenticated }) {
                 function (e) {
                     setStreaming(false)
                     if (e.name === "NotAllowedError") {
-                        console.log("Video perms denied")
                         document.getElementById("video_display").hidden = true
-                    } else {
-                        console.log("background error : " + e.name)
                     }
                 }
             )
@@ -204,21 +271,13 @@ export default function EditComponent({ username, authenticated }) {
                             onChange={() => setEditFace(!editFace)}
                         />
                     </Form.Group>
-                    <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
-                        <Form.File
-                            id="lock_gesture_form"
-                            type="file"
-                        >
-                            <Form.File.Label>Lock Gesture Combination</Form.File.Label>
-                            <Form.File.Input multiple/>
-                        </Form.File>
-                        <Form.Check
+                    <Form.Check
                             type="checkbox"
-                            label="Show Lock Combination"
-                            defaultChecked={showLockDisplay}
-                            onChange={() => setShowLockDisplay(!showLockDisplay)}
-                        />
-                    </Form.Group>
+                            label="Delete Lock Combination"
+                            defaultChecked={false}
+                            onChange={() => setDeleteLockFiles(!deleteLockFiles)}
+                    />
+                    {getLockInputs()}
                     <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                         <Form.File
                             id="unlock_gesture_form"

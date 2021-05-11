@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import Spinner from 'react-bootstrap/Spinner'
@@ -8,19 +8,20 @@ import axios from 'axios'
 import Webcam from 'react-webcam'
 
 import { ClearTokens } from '../token'
-import { uploadFiles, uploadEncoded } from '../middleware'
+import { uploadFiles, uploadEncoded, checkIfLock, checkCombination } from '../middleware'
 
 import '../../styles/logout.css'
 
 export default function LogoutComponent({ username, authenticated, setAuthenticated }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
-    const [lockFiles, setLockFiles] = useState()
+    const [lockFiles, setLockFiles] = useState({})
     const [lockDisplay, setLockDisplay] = useState([
-        <ListGroup.Item variant="secondary" key="unlock-placeholder">No unlock gestures added</ListGroup.Item>
+        <ListGroup.Item variant="secondary" key="lock-placeholder">No lock gestures added</ListGroup.Item>
     ])
     const [showLockDisplay, setShowLockDisplay] = useState(false)
     const webcamRef = React.useRef(null)
+    const [hasLock, setHasLock] = useState(true)
 
     const handleLockChange = (files) => {
         if (files !== null) {
@@ -73,6 +74,18 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         if (lockFiles === undefined) { return "No lock files were selected" }
         const lockPaths = await uploadFiles(Array.from(lockFiles))
         if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
+        const identifiedGestures = await checkCombination(lockPaths)
+        if (identifiedGestures instanceof Array) {
+            if (identifiedGestures.includes("UNKNOWN")) {
+                return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+            } else {
+                if (!window.confirm(`Identified your lock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                    return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                }
+            }
+        } else {
+            return "Failed to query server on gestures given, please try again later"
+        }
         params.append("locks", lockPaths)
 
         return axios.post("http://localhost:3001/user/auth", params)
@@ -84,9 +97,9 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in authenticating user, please try again later"
                 }
             })
@@ -111,7 +124,21 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         }
     }
 
-    if (authenticated === false) {
+    useEffect(() => {
+        async function fetchLock() {
+            const lock = await checkIfLock(username)
+            if (typeof lock === "boolean") {
+                setHasLock(lock)
+            } else {
+                alert("Failed to contact server, please try again later")
+                return window.location.href = "/dashboard"
+            }
+        }
+        fetchLock()
+    }, [username, setHasLock])
+
+    if (!authenticated || hasLock === false) {
+        ClearTokens()
         window.location.href = "/"
     } else {
         if (navigator.mediaDevices.getUserMedia !== null) {
@@ -122,10 +149,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                 function (e) {
                     setStreaming(false)
                     if (e.name === "NotAllowedError") {
-                        console.log("Video perms denied")
                         document.getElementById("video_display").hidden = true
-                    } else {
-                        console.log("background error : " + e.name)
                     }
                 }
             )

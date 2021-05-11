@@ -220,12 +220,16 @@ def adjustConfigFramework(imagePaths, username, locktype, previousFramework=None
             code=2
         )
 
-    # Adjust file to account for changes
-    newGestureLockTypeConfig = constructGestureFramework(imagePaths, username, locktype, previousFramework)
     if locktype == "lock":
-        newGestureConfig = {"lock": newGestureLockTypeConfig, "unlock": oldFullConfig["unlock"]}
+        # Adjust file to account for changes, ignoring if lock combination deletion requested
+        if len(imagePaths) != 1 and imagePaths[0] != "DELETE":
+            newGestureLockConfig = constructGestureFramework(imagePaths, username, locktype, previousFramework)
+            newGestureConfig = {"lock": newGestureLockConfig, "unlock": oldFullConfig["unlock"]}
+        else:
+            newGestureConfig = {"lock": {}, "unlock": oldFullConfig["unlock"]}
     else:
-        newGestureConfig = {"lock": oldFullConfig["lock"], "unlock": newGestureLockTypeConfig}
+        newGestureUnlockConfig = constructGestureFramework(imagePaths, username, locktype, previousFramework)
+        newGestureConfig = {"lock": oldFullConfig["lock"], "unlock": newGestureUnlockConfig}
 
     # Upload new gestures, adjusting the path of the config file to be s3 relative
     for position, details in newGestureConfig[locktype].items():
@@ -335,6 +339,14 @@ def constructGestureFramework(imagePaths, username, locktype, previousFramework=
         gestureConfig
     ))
 
+    # Gesture combination length is too short
+    if len(userGestures) < 4:
+        return commons.respond(
+            messageType="ERROR",
+            message=f"{locktype.capitalize()}ing gesture combination is too short, the minimum length permitted for a gesture combination is 4",
+            code=28
+        )
+
     # All gestures are the same in one combination
     if len(set(userGestures)) == 1:
         return commons.respond(
@@ -387,7 +399,7 @@ def parseArgs(args):
         "-a", "--action",
         required=True,
         choices=["create", "edit", "delete", "compare", "gesture"],
-        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\nedit: Edits a user --profile account's --face, --lock or --unlock feature. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout. Alternatively, you can specify a --face to compare against a --user's.\n\ngesture: Takes a number of --lock OR --unlock images as input for authenticating with the gesture recognition client against the user --profile.
+        help="""Only one action can be performed at one time:\n\ncreate: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures (OPTIONAL) and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.\n\nedit: Edits a user --profile account's --face, --lock or --unlock feature. If you wish to delete your lock combination, specify --lock DELETE in lieu of entering a combination of gesture types to change your combination to. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.\n\ndelete: Deletes a user --profile account inside S3 by doing the reverse of --action create.\n\ncompare: Starts streaming and executes the facial comparison library against ALL users in the database. Alternatively, you can specify a --face to compare against a --profile's. Or you can specify a --profile on it's own to compare the captured face with that profile's stored face. You can alter the length of the stream search timeout with --timeout.\n\ngesture: Takes a number of --lock OR --unlock images as input for authenticating with the gesture recognition client against the user --profile.
         """
     )
     argumentParser.add_argument(
@@ -400,7 +412,7 @@ def parseArgs(args):
         required=False,
         action="extend",
         nargs="+",
-        help="ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination. Use with -a edit/create to construct a new combination OR with -a gesture to attempt to authenticate with the matching gestures"
+        help="ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination (OPTIONAL). Use with -a edit/create to construct a new combination or to delete an existing one by specifying DELETE in lieu OR with -a gesture to attempt to authenticate with the matching gestures"
     )
     argumentParser.add_argument(
         "-u", "--unlock",
@@ -483,11 +495,11 @@ def main(parsedArgs=None):
                     message=f"Could not find file {argDict.face}",
                     code=8
                 )
-        # Verify we have a lock and unlock gesture combination
-        if argDict.lock is None or argDict.unlock is None:
+        # Verify we have a unlock gesture combination
+        if argDict.unlock is None:
             return commons.respond(
                 messageType="ERROR",
-                message="-l or -u was not given. Please provide locking (-l) and unlocking (-u) gesture combinations so your user account can be created.",
+                message="-l or -u was not given. Please provide a unlocking (-u) gesture combination so your user account can be created.",
                 code=13
             )
         # Verify we have a username to upload the object to
@@ -499,15 +511,22 @@ def main(parsedArgs=None):
             )
 
         # uploadedImage will the objectName so no need to check if there is a user in this function
-        index_photo.add_face_to_collection(argDict.face, argDict.name)
+        if (argDict.name is not None):
+            index_photo.add_face_to_collection(argDict.face, argDict.name)
+        else:
+            index_photo.add_face_to_collection(argDict.face, argDict.profile)
 
         # First, start the rekog project so we can actually analyse the given images
         gesture_recog.projectHandler(True)
 
         try:
             # Now iterate over lock and unlock image files, processing one a time while constructing our gestures.json
-            lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
-            unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock", lockGestureConfig)
+            lockGestureConfig = {}
+            if argDict.lock is not None:
+                lockGestureConfig = constructGestureFramework(argDict.lock, argDict.profile, "lock")
+                unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock", lockGestureConfig)
+            else:
+                unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
             gestureConfig = {"lock": lockGestureConfig, "unlock": unlockGestureConfig}
         finally:
             # Finally, close down the rekog project if specified
@@ -532,16 +551,17 @@ def main(parsedArgs=None):
 
         # Upload gestures, adjusting the path of the config file to be s3 relative
         for locktype in gestureConfig.keys():
-            for position, details in gestureConfig[locktype].items():
-                try:
-                    gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
-                except FileNotFoundError:
-                    return commons.respond(
-                        messageType="ERROR",
-                        message=f"Could no longer find file {details['path']}",
-                        code=8
-                    )
-                gestureConfig[locktype][position]["path"] = gestureObjectPath
+            if gestureConfig[locktype] != {}:
+                for position, details in gestureConfig[locktype].items():
+                    try:
+                        gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
+                    except FileNotFoundError:
+                        return commons.respond(
+                            messageType="ERROR",
+                            message=f"Could no longer find file {details['path']}",
+                            code=8
+                        )
+                    gestureConfig[locktype][position]["path"] = gestureObjectPath
 
         try:
             gestureConfigStr = json.dumps(gestureConfig, indent=2).encode("utf-8")
@@ -582,7 +602,7 @@ def main(parsedArgs=None):
             except s3Client.exceptions.NoSuchKey:
                 return commons.respond(
                     messageType="ERROR",
-                    message=f"User {argDict.profile} does not exist or failed to face file",
+                    message=f"User {argDict.profile} does not exist or failed to find face file",
                     code=9
                 )
         if argDict.face is None and argDict.lock is None and argDict.unlock is None:
@@ -784,6 +804,16 @@ def main(parsedArgs=None):
                 signal.alarm(TIMEOUT_SECONDS)
                 matchedFace = compare_faces.checkForFaces()
 
+                # If a profile has been specified, check if the face belongs to that user
+                if argDict.profile is not None:
+                    if argDict.profile not in matchedFace['Face']['ExternalImageId']:
+                        return commons.respond(
+                            messageType="ERROR",
+                            message=f"Captured face in stream does not match the stored face for {argDict.profile}",
+                            content=matchedFace,
+                            code=27
+                        )
+
                 # By this point, we have found a face so cancel the timeout and return the matched face
                 signal.alarm(0)
                 return commons.respond(
@@ -841,6 +871,15 @@ def main(parsedArgs=None):
 
         # Get user's combination length to identify when we have filled the combination
         userComboLength = int(max(gesture_recog.getUserCombinationFile(argDict.profile)[locktype]))
+
+        # No lock file for this user
+        if userComboLength == 0 and locktype == "lock":
+            return commons.respond(
+                messageType="SUCCESS",
+                message=f"No lock combination for {argDict.profile}, skipping authentication",
+                code=0
+            )
+
         try:
             print(f"[INFO] Running gesture recognition library to check for the correct {locktype}ing gestures performed in the given images...")
 

@@ -2,6 +2,7 @@ var express = require('express')
 var router = express.Router()
 var fileUpload = require('express-fileupload')
 var fs = require("fs")
+var spawn = require('child_process').spawn
 
 router.use(fileUpload())
 
@@ -42,8 +43,6 @@ router.post('/upload/file', function(req, res, next) {
       currentFilePath,
       function (err) {
         if (err) {
-          console.log("ERROR HAPPENED")
-          console.log(err)
           return res.status(500).send(err)
         }
       }
@@ -80,14 +79,66 @@ router.post('/upload/encoded', function(req, res, next) {
   let buffer = new Buffer(data, 'base64')
   fs.writeFile(path, buffer, function(err, result) {
     if (err) {
-      console.log("ERROR HAPPENED")
-      console.log(err)
       return res.status(500).send(err)
     }
   })
 
   console.log(`SUCCESSFULLY UPLOADED AND CONVERTED CAPTURE TO ${path}`)
   res.status(200).send([path])
+})
+
+router.post("/types", function(req, res, next) {
+  if (req.body.files === undefined) { res.status(500).send("No files to check for gestures") }
+
+  const files = Array.from((req.body.files).split(","))
+
+  let args = [`${process.env.ROOT_DIR}/src/scripts/gesture/gesture_recog.py`, "-m", "-a", "gesture", "-f"]
+  files.forEach(path => {
+    args.push(path)
+  })
+
+  let response = null
+  let logs = null
+  const gestureRequest = spawn("python", args)
+
+  gestureRequest.on('error', function(err) {
+    console.log(`Gesture types child process errored with message: ${err}`)
+    response = JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/src/scripts/response.json`))
+    if (response === false) {
+        res.sendStatus(500)
+    } else {
+        res.status(400).send(response)
+    }
+  })
+
+  gestureRequest.stdout.on('data', function (data) {
+      logs += "\n" + data.toString()
+  })
+
+  gestureRequest.on('close', (code) => {
+    console.log(`Gesture types child process close all stdio with code ${code}\nLogs collected:\n${logs}`)
+    response = JSON.parse(fs.readFileSync(`${process.env.ROOT_DIR}/src/scripts/response.json`))
+
+    if (response.TYPE === "ERROR") {
+      res.status(400).send(response.MESSAGE)
+    } else {
+      let gestureNames = []
+      JSON.parse(response.CONTENT)['GESTURES'].forEach(gestureObj => {
+        const filePath = Object.keys(gestureObj)[0]
+        try {
+          gestureNames.push(gestureObj[filePath]["Name"])
+        } catch (err) {
+          if (err instanceof TypeError) {
+            gestureNames.push("UNKNOWN")
+          } else {
+            res.status(500).send("Failed to parse response content object")
+          }
+        }
+      })
+      console.log(gestureNames)
+      res.status(200).send(gestureNames)
+    }
+  })
 })
 
 module.exports = router;

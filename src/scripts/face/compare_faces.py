@@ -157,6 +157,7 @@ def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
 
     :return: True if an attack is occurring, false otherwise
     """
+    threshold = 0.09
     attack = False
     for landmarkEntry in ["eyeLeft", "eyeRight", "nose", "mouthLeft", "mouthRight"]:
         # Get matching landmark in source and target
@@ -169,7 +170,7 @@ def checkPresentationAttack(sourceLandmarks, targetLandmarks, user):
         # Compare the positions of each within a certain threshold, fail if they are not within it
         xDiff = abs(round(sourceMark["X"], 3) - round(targetMark["X"], 3))
         yDiff = abs(round(sourceMark["Y"], 3) - round(targetMark["Y"], 3))
-        if ((xDiff <= 0.07) is False) or ((yDiff <= 0.07) is False):  # noqa: E712
+        if ((xDiff <= threshold) is False) or ((yDiff <= threshold) is False):  # noqa: E712
             attack = True
             break
 

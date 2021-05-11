@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import ListGroup from 'react-bootstrap/ListGroup'
@@ -7,7 +7,7 @@ import PropTypes from 'prop-types'
 import axios from 'axios'
 import Webcam from 'react-webcam'
 
-import { uploadFiles, uploadEncoded } from '../middleware'
+import { uploadFiles, uploadEncoded, checkIfLock, checkCombination } from '../middleware'
 
 import '../../styles/forgot.css'
 
@@ -20,6 +20,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
         <ListGroup.Item variant="secondary" key="unlock-placeholder">No Lock gestures added</ListGroup.Item>
     ])
     const [showDisplay, setShowGestureDisplay] = useState(false)
+    const [hasLock, setHasLock] = useState(true)
     const webcamRef = React.useRef(null)
 
     const handleGestureChange = (files) => {
@@ -57,9 +58,9 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in checking user face, please try again later"
                 }
             })
@@ -85,7 +86,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 window.location.href = "/forgot"
             }
         } else {
-            const checkRes = await checkCombination()
+            const checkRes = await verifyLock()
             setLoading(false)
 
             if (checkRes === true) {
@@ -113,22 +114,34 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 function (e) {
                     setStreaming(false)
                     if (e.name === "NotAllowedError") {
-                        console.log("Video perms denied")
                         document.getElementById("video_display").hidden = true
-                    } else {
-                        console.log("background error : " + e.name)
                     }
                 }
             )
         }
     }
 
-    async function checkCombination() {
+    async function verifyLock() {
         let params = new FormData()
         params.append("user", username)
+
         if (files === undefined) { return "No lock files were selected" }
         const paths = await uploadFiles(Array.from(files))
         if (!paths instanceof Array) { return "Failed to upload lock files" }
+
+        const identifiedGestures = await checkCombination(paths)
+        if (identifiedGestures instanceof Array) {
+            if (identifiedGestures.includes("UNKNOWN")) {
+                return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+            } else {
+                if (!window.confirm(`Identified your lock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                    return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                }
+            }
+        } else {
+            return "Failed to query server on gestures given, please try again later"
+        }
+
         params.append("locks", paths)
 
         return axios.post("http://localhost:3001/user/auth", params)
@@ -140,9 +153,9 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in authenticating user, please try again later"
                 }
             })
@@ -216,8 +229,28 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
         if (forgotBoth) { return (<Webcam id="video_display" audio={false} screenshotFormat="image/jpeg" ref={webcamRef} />) }
     }
 
-    if (!username || authenticated) {
+    useEffect(() => {
+        async function fetchLock() {
+            const lock = await checkIfLock(username)
+            if (typeof lock === "boolean") {
+                setHasLock(lock)
+
+                // Check if the user has a lock combination
+                if (hasLock === false) {
+                    handleForgotBoth()
+                }
+            } else {
+                alert("Failed to contact server, please try again later")
+                return window.location.href = !username ? "/" : "/dashboard"
+            }
+        }
+        fetchLock()
+    }, [username, hasLock])
+
+    if (!username || (!localStorage.getItem('exists') || localStorage.getItem('exists') === 'false')) {
         window.location.href = "/"
+    } else if (authenticated) {
+        window.location.href = "/dashboard"
     } else {
         return (
             <div className="forgot-wrapper">

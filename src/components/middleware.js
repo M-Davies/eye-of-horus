@@ -44,3 +44,45 @@ export function uploadFiles(files) {
             }
         })
 }
+
+export function checkIfLock(username) {
+    let params = new FormData()
+    params.append("user", username)
+
+    return axios.post("http://localhost:3001/user/hasLock", params)
+        .then(res => {
+            if (res.status === 200) {
+                return res.data
+            } else {
+                return JSON.stringify(res.data)
+            }
+        })
+        .catch(function (error) {
+            try {
+                return error.response.data
+            } catch {
+                return "Server error in authenticating user, please try again later"
+            }
+        })
+}
+
+export function checkCombination(paths) {
+    let params = new FormData()
+    params.append("files", paths)
+
+    return axios.post("http://localhost:3001/types", params)
+        .then(res => {
+            if (res.status === 200) {
+                return Array.from(res.data)
+            } else {
+                return JSON.stringify(res.data)
+            }
+        })
+        .catch(function (error) {
+            try {
+                return error.response.data
+            } catch {
+                return "Server error in checking gesture combination types"
+            }
+        })
+}

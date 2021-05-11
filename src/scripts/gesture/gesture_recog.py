@@ -82,7 +82,7 @@ def getGestureTypes():
         lambda jsonObject: list(filter(None, jsonObject["Prefix"].split("/"))),
         s3Client.list_objects_v2(
             Bucket=os.getenv('FACE_RECOG_BUCKET'),
-            Prefix="gestureTraining/",
+            Prefix="gestureTraining/mixed/",  # TODO: CHECK THIS
             Delimiter="/"
         )["CommonPrefixes"]
     ))
@@ -95,7 +95,7 @@ def checkForGestures(image):
     :param image: Locally stored image OR image bytes OR stream frame to scan for authentication gestures
     :return: JSON object containing the gesture with the highest confidence OR None if no recognised gesture was found
     """
-    confidence = 95
+    minConfidence = 50
     arn = os.getenv("LATEST_MODEL_ARN")
 
     # The param given is a local image file
@@ -107,7 +107,7 @@ def checkForGestures(image):
                     Image={
                         'Bytes': fileBytes.read(),
                     },
-                    MinConfidence=confidence,
+                    MinConfidence=minConfidence,
                     ProjectVersionArn=arn
                 )['CustomLabels']
             except ClientError as e:
@@ -129,7 +129,7 @@ def checkForGestures(image):
                         'Name': image,
                     }
                 },
-                MinConfidence=confidence,
+                MinConfidence=minConfidence,
                 ProjectVersionArn=arn
             )['CustomLabels']
         except Exception as e:
@@ -179,7 +179,7 @@ def awaitProject(start):
     """
     if start:
         delay = 30
-        maxAttempts = 60
+        maxAttempts = 50
         timeoutSeconds = delay * maxAttempts
 
         print(f"[INFO] {os.getenv('GESTURE_RECOG_PROJECT_NAME')} has been started. Waiting {timeoutSeconds}s for confirmation from AWS...")
@@ -187,6 +187,9 @@ def awaitProject(start):
         try:
             waitHandler.wait(
                 ProjectArn=os.getenv("PROJECT_ARN"),
+                VersionNames=[
+                    os.getenv('LATEST_MODEL_VERSION')
+                ],
                 WaiterConfig={
                     "Delay": delay,
                     "MaxAttempts": maxAttempts
@@ -364,13 +367,13 @@ def main(argv):
                     # We have found a gesture
                     if foundGesture is not None:
                         foundGestures.append({f"{imagePath}": foundGesture})
-                        continue
                     else:
                         print(f"[WARNING] No gesture was found within {imagePath} (Available gestures = {' '.join(getGestureTypes())})")
+                        foundGestures.append({f"{imagePath}": None})
                 else:
                     return commons.respond(
                         messageType="ERROR",
-                        message=f"No such file {argDict.file}",
+                        message=f"No such file {imagePath}",
                         code=8
                     )
         finally:
@@ -382,7 +385,6 @@ def main(argv):
             return commons.respond(
                 messageType="ERROR",
                 message="No gestures were found within the images",
-                content={"GESTURES": foundGestures},
                 code=17
             )
         else:

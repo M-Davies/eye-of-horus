@@ -36,14 +36,14 @@ export default function DashboardComponent({ username, authenticated }) {
                 })
                 .catch(function (error) {
                     setDeleting(false)
-                    if (error.response.data) {
+                    try {
                         const responseData = JSON.stringify(error.response.data)
                         if (responseData.TYPE === undefined) {
                             alert(`${responseData}`)
                         } else {
                             alert(`${responseData.TYPE}\n${responseData.MESSAGE}`)
                         }
-                    } else {
+                    } catch {
                         alert("Server error in user deletion, please try again later")
                     }
                     window.location.href = "/dashboard"

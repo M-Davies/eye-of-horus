@@ -7,7 +7,7 @@ import PropTypes from 'prop-types'
 import Webcam from 'react-webcam'
 import axios from 'axios'
 
-import { uploadFiles, uploadEncoded } from '../middleware'
+import { uploadFiles, uploadEncoded, checkCombination } from '../middleware'
 
 import "../../styles/authenticate.css"
 
@@ -21,8 +21,8 @@ export default function AuthenticateComponent({
 }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
-    const [lockFiles, setLockFiles] = useState()
-    const [unlockFiles, setUnlockFiles] = useState()
+    const [lockFiles, setLockFiles] = useState({})
+    const [unlockFiles, setUnlockFiles] = useState({})
     const [lockDisplay, setLockDisplay] = useState([
         <ListGroup.Item variant="secondary" key="lock-placeholder">No lock gestures added</ListGroup.Item>
     ])
@@ -46,21 +46,46 @@ export default function AuthenticateComponent({
             params.append("face", facePath)
         }
 
-        if (lockFiles === undefined || lockFiles === null) { return "No lock files were selected" }
-        const lockPaths = await uploadFiles(Array.from(lockFiles))
-        if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
-        params.append("locks", lockPaths)
+        if (lockFiles) {
+            const lockPaths = await uploadFiles(Array.from(lockFiles))
+            if (!lockPaths instanceof Array) { return "Failed to upload lock files" }
 
-        if (unlockFiles === undefined || unlockFiles === null) { return "No unlock files were selected" }
+            // Verify combination is what the user expected
+            const identifiedGestures = await checkCombination(lockPaths)
+            if (identifiedGestures instanceof Array) {
+                if (identifiedGestures.includes("UNKNOWN")) {
+                    return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+                } else {
+                    if (!window.confirm(`Identified your lock gesture combination as the below. Is this correct?\n${identifiedGestures.join(' ')}`)) {
+                        return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                    }
+                }
+            } else {
+                return "Failed to query server on gestures given, please try again later"
+            }
+
+            params.append("locks", lockPaths)
+        }
+
+        if (!unlockFiles) { return "No unlock files were selected" }
         const unlockPaths = await uploadFiles(Array.from(unlockFiles))
         if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
-        params.append("unlocks", unlockPaths)
 
-        console.log("Requesting user create with params")
-        console.log(params.username)
-        console.log(params.face)
-        console.log(params.locks)
-        console.log(params.unlocks)
+        // Verify combination is what the user expected
+        const identifiedGestures = await checkCombination(unlockPaths)
+        if (identifiedGestures instanceof Array) {
+            if (identifiedGestures.includes("UNKNOWN")) {
+                return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+            } else {
+                if (!window.confirm(`Identified your unlock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                    return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                }
+            }
+        } else {
+            return "Failed to query server on gestures given, please try again later"
+        }
+
+        params.append("unlocks", unlockPaths)
 
         // Create user profile
         return axios.post("http://localhost:3001/user/create", params)
@@ -72,9 +97,9 @@ export default function AuthenticateComponent({
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in user creation, please try again later"
                 }
             })
@@ -93,9 +118,23 @@ export default function AuthenticateComponent({
             params.append("face", facePath)
         }
 
-        if (unlockFiles === undefined || unlockFiles === null) { return "No unlock files were selected" }
+        if (!unlockFiles) { return "No unlock files were selected" }
         const unlockPaths = await uploadFiles(Array.from(unlockFiles))
         if (!unlockPaths instanceof Array) { return "Failed to upload unlock files" }
+
+        const identifiedGestures = await checkCombination(unlockPaths)
+        if (identifiedGestures instanceof Array) {
+            if (identifiedGestures.includes("UNKNOWN")) {
+                return `One or more gestures haven't been identified as a known gesture type, please ensure your image clearly shows the gesture being performed\n${identifiedGestures.join(' ')}`
+            } else {
+                if (!window.confirm(`Identified your unlock gesture combination as the below\nIs this correct?\n${identifiedGestures.join(' ')}`)) {
+                    return "Please chose images for your gesture combination that clearly show the gesture type you wish to use"
+                }
+            }
+        } else {
+            return "Failed to query server on gestures given, please try again later"
+        }
+
         params.append("unlocks", unlockPaths)
 
         // Authenticate user
@@ -108,22 +147,22 @@ export default function AuthenticateComponent({
                 }
             })
             .catch(function (error) {
-                if (error.response.data) {
+                try {
                     return error.response.data
-                } else {
+                } catch {
                     return "Server error in user authentication, please try again later"
                 }
             })
     }
 
-    const handleLockChange = (files) => {
+    const handleLockChange = async (files) => {
         setLockFiles(files)
-        generateFileList(files, null)
+        await generateFileList(files, null)
     }
 
-    const handleUnlockChange = (files) => {
+    const handleUnlockChange = async (files) => {
         setUnlockFiles(files)
-        generateFileList(null, files)
+        await generateFileList(null, files)
     }
 
     const handleSubmit = async e => {
@@ -147,7 +186,7 @@ export default function AuthenticateComponent({
                 } else {
                     alert(`${userCreateRes.TYPE}\n${userCreateRes.MESSAGE}`)
                 }
-                window.location.href = "/register"
+                window.location.reload()
             }
         } else {
             // Send login request to server
@@ -214,7 +253,6 @@ export default function AuthenticateComponent({
 
     function getGestureForms() {
         if (registering) {
-            // If this is a registration page, generate the editable forms depending on the given
             return (
                 <div className="gesture-forms">
                     <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
@@ -222,7 +260,7 @@ export default function AuthenticateComponent({
                             id="lock_gesture_form"
                             type="file"
                         >
-                            <Form.File.Label>Chose at least 4 gestures as your lock gesture combination</Form.File.Label>
+                            <Form.File.Label>Chose at least 4 gestures as your lock gesture combination (OPTIONAL)</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
                         <Form.Check
@@ -307,11 +345,13 @@ export default function AuthenticateComponent({
         }
     }
 
-    if (authenticated === true) {
+    if (authenticated) {
         window.location.href = "/dashboard"
-    } else if (userExists === true && window.location.pathname === "/register") {
+    } else if (!username || !localStorage.getItem("exists")) {
+        window.location.href = "/"
+    } else if (localStorage.getItem("exists") === 'true' && window.location.pathname === "/register") {
         window.location.href = "/login"
-    } else if (userExists === false && window.location.pathname === "/login") {
+    } else if (localStorage.getItem("exists") === 'false' && window.location.pathname === "/login") {
         window.location.href = "/register"
     } else {
         if (navigator.mediaDevices.getUserMedia !== null) {
@@ -322,10 +362,7 @@ export default function AuthenticateComponent({
                 function (e) {
                     setStreaming(false)
                     if (e.name === "NotAllowedError") {
-                        console.log("Video perms denied")
                         document.getElementById("video_display").hidden = true
-                    } else {
-                        console.log("background error : " + e.name)
                     }
                 }
             )

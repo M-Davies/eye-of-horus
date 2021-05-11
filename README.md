@@ -1,6 +1,6 @@
 # eye-of-horus
 
-A face and gesture recognition authentication system, the eye of horus is my Final Year University of Plymouth Project that will account for 40 credits of my grade this year. My supervisor for this project is [Professor Nathan Clark](https://www.plymouth.ac.uk/staff/nathan-clarke).
+A face and gesture recognition authentication system, the eye of horus is my [Final Year University of Plymouth Project](http://web.socem.plymouth.ac.uk/secam/public/cis.php) that will account for 40 credits of my grade this year. My supervisor for this project is [Professor Nathan Clark](https://www.plymouth.ac.uk/staff/nathan-clarke).
 
 <p align="center">
     <a href="https://aws.amazon.com/s3/"><img height="50px" width="70px" src="https://www.alooma.com/img/integrations/s3.png"/></a>
@@ -21,6 +21,7 @@ A face and gesture recognition authentication system, the eye of horus is my Fin
     - [Architecture](#Architecture)
     - [Method](#Method)
 - [Management](#Management)
+- [Concessions](#Concessions)
 
 ## Vision
 
@@ -103,3 +104,10 @@ Due to university regulations on final year projects, my non code backlog is rec
 https://outlook.office365.com/owa/eyeofhorusPlanner@group.plymouth.ac.uk/groupsubscription.ashx?action=join&source=MSExchange/LokiServer&guid=a322b80f-c38a-44dd-b956-e9b43f82ec87
 
 Code related tasks are recorded on the [GitHub Project Board](https://github.com/M-Davies/eye-of-horus/projects/1) to allow for greater automation and drawing of references between tasks. See active and past sprints (that are tied to the board and individual tasks) by [viewing the project milestones](https://github.com/M-Davies/eye-of-horus/milestones).
+
+## Concessions
+
+These concessions are known bugs/problems with either the website, python library, aws services or all or some of the above.
+
+- **Facial Recognition:** The python library employs counter presentation attack tactics to ensure a picture of a user's face cannot be used to authenticate without their permission. Inevitably, this may result in false positives where the system thinks your real face is a fake image being shown to it. Please ensure that when authenticating with the system, you position your face to the same position as your stored face as close as humanly possible. If that doesn't work, ensure that you are using the same device to authenticate as you did to take the stored photo and adjusting your background to be less cluttered.
+- **Gesture Recognition:** Gesture recognition is plagued by inaccuracies due to how similar each gesture type is to each other. If your gestures are being identified incorrectly (or not at all), try following the steps at the end of the [training notes document](testing/gesture/TrainingNotes.md).

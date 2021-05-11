@@ -19,19 +19,19 @@ optional arguments:
   -a {create,edit,delete,compare,gesture}, --action {create,edit,delete,compare,gesture}
                         Only one action can be performed at one time:
 
-                        create: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.
+                        create: Creates a new user --profile in s3 and uploads and indexes the --face file alongside the ----lock-gestures (OPTIONAL) and --unlock-gestures image files. --name can optionally be added if the name of the --face file is not what it should be in S3.
 
-                        edit: Edits a user --profile account's --face, --lock or --unlock feature. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.
+                        edit: Edits a user --profile account's --face, --lock or --unlock feature. If you wish to delete your lock combination, specify --lock DELETE in lieu of entering a combination of gesture types to change your combination to. Note: It is not possible to rename a user --profile. Please delete your account and create a new one if you wish to do so.
 
                         delete: Deletes a user --profile account inside S3 by doing the reverse of --action create.
 
-                        compare: Starts streaming and executes the facial comparison library against ALL users in the database. You can alter the length of the stream search timeout with --timeout. Alternatively, you can specify a --face to compare against a --user's.
+                        compare: Starts streaming and executes the facial comparison library against ALL users in the database. Alternatively, you can specify a --face to compare against a --profile's. Or you can specify a --profile on it's own to compare the captured face with that profile's stored face. You can alter the length of the stream search timeout with --timeout.
 
                         gesture: Takes a number of --lock OR --unlock images as input for authenticating with the gesture recognition client against the user --profile.
 
   -f FACE, --face FACE  Path to the jpg or png image file to use as your facial recognition face to compare against when running the kinesis stream
   -l LOCK [LOCK ...], --lock LOCK [LOCK ...]
-                        ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination. Use with -a edit/create to construct a new combination OR with -a gesture to attempt to authenticate with the matching gestures
+                        ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's lock gesture recognition combination (OPTIONAL). Use with -a edit/create to construct a new combination or to delete an existing one by specifying DELETE in lieu OR with -a gesture to attempt to authenticate with the matching gestures
   -u UNLOCK [UNLOCK ...], --unlock UNLOCK [UNLOCK ...]
                         ABSOLUTE Paths to jpg or png image files (seperated with spaces) to use as the --profile user's unlock gesture recognition combination. Use with -a edit/create to construct a new combination OR with -a gesture to attempt to authenticate with the matching gestures
   -n NAME, --name NAME  S3 name of the face image to be uploaded. This is what the image will be stored as in S3. If not specified, the filename passed to --file is used instead.
@@ -105,3 +105,5 @@ No matter the script, all will exit with one of the following codes. For more in
 24. Given image is too large for detection of custom labels
 25. ClientError on image processing of custom labels. Likelihood is too large to even send with detect_custom_labels
 26. User gesture combination api is rate-limited
+27. Captured face in stream does not match the user's face
+28. Rule Violation: Given gesture combination for the specific locktype is too short (minimum combination length = 4)
