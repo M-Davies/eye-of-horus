@@ -74,7 +74,7 @@ These gestures will be the initial "default" gestures user's can incorporate int
 These are the recommended specifications to create your gesture images against. This will minimise false positives and negatives:
 
 - Ensure that in your image, the gesture is taking up the majority of the foreground and that the background is not cluttered or containing any hands of any kind (even non-human ones!)
-- For `closed-hand` images, the palm needs to be facing AWAY from camera
+- For `closed-hand` images, you should use your RIGHT hand and the palm needs to be facing AWAY from camera
 - For `open-hand` images, the palm needs to be facing TOWARDS camera
-- For `thumb-out` images, the palm needs to be facing AWAY from camera (thumb down)
+- For `thumb-out` images, you should use your RIGHT hand and the palm needs to be facing AWAY from camera (thumb down)
 - For `three-fingers` images, the three fingers need to facing HORIZONTAL with the palm TOWARDS the camera
