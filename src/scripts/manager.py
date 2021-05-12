@@ -528,62 +528,63 @@ def main(parsedArgs=None):
             else:
                 unlockGestureConfig = constructGestureFramework(argDict.unlock, argDict.profile, "unlock")
             gestureConfig = {"lock": lockGestureConfig, "unlock": unlockGestureConfig}
+
+            # Finally, upload all the files featured in these processes (including the gesture config file)
+            print("[INFO] All tests passed and profiles constructed. Uploading all files to database...")
+
+            # Upload face
+            try:
+                if argDict.name is not None:
+                    upload_file(argDict.face, argDict.profile, None, argDict.name)
+                else:
+                    upload_file(argDict.face, argDict.profile, None, f"{argDict.profile}.jpg")
+            except FileNotFoundError:
+                return commons.respond(
+                    messageType="ERROR",
+                    message=f"No such file {argDict.face}",
+                    code=8
+                )
+
+            # Upload gestures, adjusting the path of the config file to be s3 relative
+            for locktype in gestureConfig.keys():
+                if gestureConfig[locktype] != {}:
+                    for position, details in gestureConfig[locktype].items():
+                        try:
+                            gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
+                        except FileNotFoundError:
+                            return commons.respond(
+                                messageType="ERROR",
+                                message=f"Could no longer find file {details['path']}",
+                                code=8
+                            )
+                        gestureConfig[locktype][position]["path"] = gestureObjectPath
+
+            try:
+                gestureConfigStr = json.dumps(gestureConfig, indent=2).encode("utf-8")
+                s3Client.put_object(
+                    Body=gestureConfigStr,
+                    Bucket=os.getenv("FACE_RECOG_BUCKET"),
+                    Key=f"users/{argDict.profile}/gestures/GestureConfig.json"
+                )
+            except Exception as e:
+                return commons.respond(
+                    messageType="ERROR",
+                    message="Failed to upload the gesture configuration file. Gesture and face images have already been uploaded. Recommend you delete your user account with -a delete and try remaking it.",
+                    content={"ERROR": str(e)},
+                    code=3
+                )
+
+            print("[SUCCESS] Config file uploaded!")
+            return commons.respond(
+                messageType="SUCCESS",
+                message="Facial recognition and gesture recognition images and configs files have been successfully uploaded!",
+                code=0
+            )
+
         finally:
             # Finally, close down the rekog project if specified
             if argDict.maintain is False:
                 gesture_recog.projectHandler(False)
-
-        # Finally, upload all the files featured in these processes (including the gesture config file)
-        print("[INFO] All tests passed and profiles constructing. Uploading face...")
-
-        # Upload face
-        try:
-            if argDict.name is not None:
-                upload_file(argDict.face, argDict.profile, None, argDict.name)
-            else:
-                upload_file(argDict.face, argDict.profile, None, f"{argDict.profile}.jpg")
-        except FileNotFoundError:
-            return commons.respond(
-                messageType="ERROR",
-                message=f"No such file {argDict.face}",
-                code=8
-            )
-
-        # Upload gestures, adjusting the path of the config file to be s3 relative
-        for locktype in gestureConfig.keys():
-            if gestureConfig[locktype] != {}:
-                for position, details in gestureConfig[locktype].items():
-                    try:
-                        gestureObjectPath = upload_file(details["path"], argDict.profile, locktype, f"{locktype.capitalize()}Gesture{position}")
-                    except FileNotFoundError:
-                        return commons.respond(
-                            messageType="ERROR",
-                            message=f"Could no longer find file {details['path']}",
-                            code=8
-                        )
-                    gestureConfig[locktype][position]["path"] = gestureObjectPath
-
-        try:
-            gestureConfigStr = json.dumps(gestureConfig, indent=2).encode("utf-8")
-            s3Client.put_object(
-                Body=gestureConfigStr,
-                Bucket=os.getenv("FACE_RECOG_BUCKET"),
-                Key=f"users/{argDict.profile}/gestures/GestureConfig.json"
-            )
-        except Exception as e:
-            return commons.respond(
-                messageType="ERROR",
-                message="Failed to upload the gesture configuration file. Gesture and face images have already been uploaded. Recommend you delete your user account with -a delete and try remaking it.",
-                content={"ERROR": str(e)},
-                code=3
-            )
-
-        print("[SUCCESS] Config file uploaded!")
-        return commons.respond(
-            messageType="SUCCESS",
-            message="Facial recognition and gesture recognition images and configs files have been successfully uploaded!",
-            code=0
-        )
 
     elif argDict.action == "edit":
         # Verify we have a user to edit
@@ -793,7 +794,10 @@ def main(parsedArgs=None):
             if argDict.timeout is not None:
                 TIMEOUT_SECONDS = argDict.timeout
 
-            print(f"[INFO] Running facial comparison library to check for user faces in current stream (timing out after {TIMEOUT_SECONDS}s)...")
+            if argDict.profile is None:
+                print(f"[INFO] Running facial comparison library to check for any known faces in current stream (timing out after {TIMEOUT_SECONDS}s)...")
+            else:
+                print(f"[INFO] Running facial comparison library to check for {argDict.profile} stored face in current stream (timing out after {TIMEOUT_SECONDS}s)...")
 
             # Start/end stream
             streamHandler(True, 3)
@@ -866,21 +870,21 @@ def main(parsedArgs=None):
                 locktype = "unlock"
                 imagePaths = argDict.unlock
 
-        # Start rekognition model
-        gesture_recog.projectHandler(True)
-
-        # Get user's combination length to identify when we have filled the combination
-        userComboLength = int(max(gesture_recog.getUserCombinationFile(argDict.profile)[locktype]))
-
-        # No lock file for this user
-        if userComboLength == 0 and locktype == "lock":
-            return commons.respond(
-                messageType="SUCCESS",
-                message=f"No lock combination for {argDict.profile}, skipping authentication",
-                code=0
-            )
-
         try:
+            # Start rekognition model
+            gesture_recog.projectHandler(True)
+
+            # Get user's combination length to identify when we have filled the combination
+            userComboLength = int(max(gesture_recog.getUserCombinationFile(argDict.profile)[locktype]))
+
+            # No lock file for this user
+            if userComboLength == 0 and locktype == "lock":
+                return commons.respond(
+                    messageType="SUCCESS",
+                    message=f"No lock combination for {argDict.profile}, skipping authentication",
+                    code=0
+                )
+
             print(f"[INFO] Running gesture recognition library to check for the correct {locktype}ing gestures performed in the given images...")
 
             matchedGestures = 1
