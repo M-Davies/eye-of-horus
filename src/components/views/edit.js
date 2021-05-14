@@ -9,7 +9,7 @@ import Webcam from 'react-webcam'
 
 import { uploadFiles, uploadEncoded, checkCombination } from '../middleware'
 
-export default function EditComponent({ username, authenticated }) {
+export default function EditComponent({ username }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
     const [editFace, setEditFace] = useState(false)
@@ -171,32 +171,34 @@ export default function EditComponent({ username, authenticated }) {
                             <Form.File.Label>Lock Gesture Combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Lock Combination"
-                            defaultChecked={false}
-                            onChange={() => setShowLockDisplay(!showLockDisplay)}
-                        />
                     </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Lock Combination"
+                        defaultChecked={false}
+                        onChange={() => setShowLockDisplay(!showLockDisplay)}
+                    />
                 </fieldset>
             )
         } else {
             return (
-                <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
-                    <Form.File
-                        id="lock_gesture_form"
-                        type="file"
-                    >
-                        <Form.File.Label>Lock Gesture Combination</Form.File.Label>
-                        <Form.File.Input multiple/>
-                    </Form.File>
+                <div>
+                    <Form.Group onChange={(e) => handleLockChange(e.target.files)}>
+                        <Form.File
+                            id="lock_gesture_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Lock Gesture Combination</Form.File.Label>
+                            <Form.File.Input multiple/>
+                        </Form.File>
+                    </Form.Group>
                     <Form.Check
                         type="checkbox"
                         label="Show Lock Combination"
                         defaultChecked={showLockDisplay}
                         onChange={() => setShowLockDisplay(!showLockDisplay)}
                     />
-                </Form.Group>
+                </div>
             )
         }
     }
@@ -232,7 +234,7 @@ export default function EditComponent({ username, authenticated }) {
         }
     }
 
-    if (!authenticated) {
+    if (!localStorage.getItem('authenticated')) {
         window.location.href = "/"
     } else {
         if (navigator.mediaDevices.getUserMedia !== null && editFace === true) {
@@ -286,13 +288,13 @@ export default function EditComponent({ username, authenticated }) {
                             <Form.File.Label>Unlock Gesture Combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Unlock Combination"
-                            defaultChecked={showUnlockDisplay}
-                            onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
-                        />
                     </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Unlock Combination"
+                        defaultChecked={showUnlockDisplay}
+                        onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                    />
                     {getButton()}
                 </Form>
                 <ListGroup className="lock-display" hidden={!showLockDisplay}>
@@ -307,6 +309,5 @@ export default function EditComponent({ username, authenticated }) {
 }
 
 EditComponent.propTypes = {
-    username: PropTypes.string,
-    authenticated: PropTypes.bool
+    username: PropTypes.string
 }

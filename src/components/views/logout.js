@@ -12,7 +12,7 @@ import { uploadFiles, uploadEncoded, checkIfLock, checkCombination } from '../mi
 
 import '../../styles/logout.css'
 
-export default function LogoutComponent({ username, authenticated, setAuthenticated }) {
+export default function LogoutComponent({ username }) {
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
     const [lockFiles, setLockFiles] = useState({})
@@ -137,7 +137,7 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
         fetchLock()
     }, [username, setHasLock])
 
-    if (!authenticated || hasLock === false) {
+    if (!localStorage.getItem('authenticated') || hasLock === false) {
         ClearTokens()
         window.location.href = "/"
     } else {
@@ -170,13 +170,13 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
                                 <Form.File.Label>Lock Combination (if you have forgotten it, <a href="/edit">edit it here</a>)</Form.File.Label>
                                 <Form.File.Input multiple/>
                             </Form.File>
-                            <Form.Check
-                                type="checkbox"
-                                label="Show Lock Combination"
-                                defaultChecked={showLockDisplay}
-                                onChange={() => setShowLockDisplay(!showLockDisplay)}
-                            />
                         </Form.Group>
+                        <Form.Check
+                            type="checkbox"
+                            label="Show Lock Combination"
+                            defaultChecked={showLockDisplay}
+                            onChange={() => setShowLockDisplay(!showLockDisplay)}
+                        />
                         <fieldset disabled>
                             <Form.Group>
                                 <Form.File
@@ -200,7 +200,5 @@ export default function LogoutComponent({ username, authenticated, setAuthentica
 }
 
 LogoutComponent.propTypes = {
-    username: PropTypes.string,
-    authenticated: PropTypes.bool,
-    setAuthenticated: PropTypes.func
+    username: PropTypes.string
 }

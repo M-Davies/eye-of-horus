@@ -35,7 +35,7 @@ async function userExists(username) {
         })
 }
 
-export default function UserComponent({ setUsername, setUserExists, authenticated }) {
+export default function UserComponent({ setUsername }) {
     const [username, setName] = useState()
     const [loading, setLoading] = useState(false)
 
@@ -59,7 +59,7 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
                 alert(exists)
                 window.location.reload()
             } else {
-                setUserExists(exists)
+                localStorage.setItem('exists', exists)
 
                 if (exists === true) {
                     window.location.href = "/login"
@@ -92,7 +92,7 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
         }
     }
 
-    if (authenticated) {
+    if (localStorage.getItem('authenticated')) {
         window.location.href = "/dashboard"
     }
 
@@ -115,7 +115,5 @@ export default function UserComponent({ setUsername, setUserExists, authenticate
 }
 
 UserComponent.propTypes = {
-    setUsername: PropTypes.func,
-    setUserExists: PropTypes.func,
-    authenticated: PropTypes.bool
+    setUsername: PropTypes.func
 }

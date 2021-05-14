@@ -11,7 +11,7 @@ import { uploadFiles, uploadEncoded, checkIfLock, checkCombination } from '../mi
 
 import '../../styles/forgot.css'
 
-export default function ForgotComponent({username, authenticated, setAuthenticated}) {
+export default function ForgotComponent({username}) {
     const [files, setFiles] = useState()
     const [loading, setLoading] = useState(false)
     const [streaming, setStreaming] = useState(false)
@@ -74,7 +74,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
             setLoading(false)
 
             if (checkFace === true) {
-                setAuthenticated(true)
+                localStorage.setItem('authenticated', true)
                 alert("Face matches, you are now logged in and can change your gesture combinations")
                 window.location.href = "/edit"
             } else {
@@ -90,7 +90,7 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
             setLoading(false)
 
             if (checkRes === true) {
-                setAuthenticated(true)
+                localStorage.setItem('authenticated', true)
                 alert("Lock combination is correct, you are now signed in and can change your unlock combination")
                 window.location.href = "/edit"
             } else {
@@ -195,32 +195,34 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
                             <Form.File.Label>Recovering your lock and unlock combinations using your face...</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Lock Combination"
-                            defaultChecked={showDisplay}
-                            onChange={() => setShowGestureDisplay(!showDisplay)}
-                        />
                     </Form.Group>
-                </fieldset>
-            )
-        } else {
-            return (
-                <Form.Group onChange={(e) => handleGestureChange(e.target.files)}>
-                    <Form.File
-                        id="gesture_form"
-                        type="file"
-                    >
-                        <Form.File.Label>Enter your Lock combination</Form.File.Label>
-                        <Form.File.Input multiple/>
-                    </Form.File>
                     <Form.Check
                         type="checkbox"
                         label="Show Lock Combination"
                         defaultChecked={showDisplay}
                         onChange={() => setShowGestureDisplay(!showDisplay)}
                     />
-                </Form.Group>
+                </fieldset>
+            )
+        } else {
+            return (
+                <div>
+                    <Form.Group onChange={(e) => handleGestureChange(e.target.files)}>
+                        <Form.File
+                            id="gesture_form"
+                            type="file"
+                        >
+                            <Form.File.Label>Enter your Lock combination</Form.File.Label>
+                            <Form.File.Input multiple/>
+                        </Form.File>
+                    </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Lock Combination"
+                        defaultChecked={showDisplay}
+                        onChange={() => setShowGestureDisplay(!showDisplay)}
+                    />
+                </div>
             )
         }
     }
@@ -247,9 +249,9 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
         fetchLock()
     }, [username, hasLock])
 
-    if (!username || (!localStorage.getItem('exists') || localStorage.getItem('exists') === 'false')) {
+    if (!username || localStorage.getItem('exists') !== 'true') {
         window.location.href = "/"
-    } else if (authenticated) {
+    } else if (localStorage.getItem('authenticated') === 'true') {
         window.location.href = "/dashboard"
     } else {
         return (
@@ -279,7 +281,5 @@ export default function ForgotComponent({username, authenticated, setAuthenticat
 }
 
 ForgotComponent.propTypes = {
-    username: PropTypes.string,
-    authenticated: PropTypes.bool,
-    setAuthenticated: PropTypes.func.isRequired
+    username: PropTypes.string
 }

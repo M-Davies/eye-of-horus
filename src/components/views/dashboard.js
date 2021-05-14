@@ -8,7 +8,7 @@ import '../../styles/dashboard.css'
 
 import { ClearTokens } from '../token'
 
-export default function DashboardComponent({ username, authenticated }) {
+export default function DashboardComponent({ username }) {
     const [deleting, setDeleting] = useState(false)
 
     const handleDeleteClick = async e => {
@@ -51,7 +51,7 @@ export default function DashboardComponent({ username, authenticated }) {
         }
     }
 
-    if (!authenticated) {
+    if (!localStorage.getItem('authenticated')) {
         window.location.href = "/"
     } else {
         if (deleting) {

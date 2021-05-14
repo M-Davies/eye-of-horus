@@ -13,10 +13,6 @@ import "../../styles/authenticate.css"
 
 export default function AuthenticateComponent({
     username,
-    userExists,
-    setUserExists,
-    authenticated,
-    setAuthenticated,
     registering
 }) {
     const [loading, setLoading] = useState(false)
@@ -155,14 +151,14 @@ export default function AuthenticateComponent({
             })
     }
 
-    const handleLockChange = async (files) => {
+    const handleLockChange = (files) => {
         setLockFiles(files)
-        await generateFileList(files, null)
+        generateFileList(files, null)
     }
 
-    const handleUnlockChange = async (files) => {
+    const handleUnlockChange = (files) => {
         setUnlockFiles(files)
-        await generateFileList(null, files)
+        generateFileList(null, files)
     }
 
     const handleSubmit = async e => {
@@ -174,10 +170,10 @@ export default function AuthenticateComponent({
             const userCreateRes = await createUser()
             setLoading(false)
 
-            // If successful at creating user, move to login
+            // If successful at creating user, move to dashboard
             if (userCreateRes === true) {
-                setUserExists(userCreateRes)
-                setAuthenticated(true)
+                localStorage.setItem('exists', true)
+                localStorage.setItem('authenticated', true)
                 window.location.href = "/dashboard"
             } else {
                 // If unsuccessful, return to default registration with error alert
@@ -195,10 +191,9 @@ export default function AuthenticateComponent({
 
             // If successful at logging in user, move to dashboard
             if (userLoginRes === true) {
-                setAuthenticated(true)
+                localStorage.setItem('authenticated', true)
                 window.location.href = "/dashboard"
             } else if (userLoginRes.CODE === 10) {
-                setAuthenticated(false)
                 alert(`Failed to login with given face or unlock credentials\n${userLoginRes.MESSAGE}`)
                 window.location.href = "/login"
             } else {
@@ -263,13 +258,13 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Chose at least 4 gestures as your lock gesture combination (OPTIONAL)</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Lock Combination"
-                            defaultChecked={showLockDisplay}
-                            onChange={() => setShowLockDisplay(!showLockDisplay)}
-                        />
                     </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Lock Combination"
+                        defaultChecked={showLockDisplay}
+                        onChange={() => setShowLockDisplay(!showLockDisplay)}
+                    />
                     <Form.Group onChange={(e) => handleUnlockChange(e.target.files)}>
                         <Form.File
                             id="unlock_gesture_form"
@@ -278,13 +273,13 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Chose at least 4 other gestures as your unlock gesture combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Unlock Combination"
-                            defaultChecked={showUnlockDisplay}
-                            onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
-                        />
                     </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Unlock Combination"
+                        defaultChecked={showUnlockDisplay}
+                        onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                    />
                 </div>
             )
         } else {
@@ -310,13 +305,13 @@ export default function AuthenticateComponent({
                             <Form.File.Label>Please enter your unlock combination</Form.File.Label>
                             <Form.File.Input multiple/>
                         </Form.File>
-                        <Form.Check
-                            type="checkbox"
-                            label="Show Unlock Combination"
-                            defaultChecked={showUnlockDisplay}
-                            onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
-                        />
                     </Form.Group>
+                    <Form.Check
+                        type="checkbox"
+                        label="Show Unlock Combination"
+                        defaultChecked={showUnlockDisplay}
+                        onChange={() => setShowUnlockDisplay(!showUnlockDisplay)}
+                    />
                     <Button variant="danger" href="/forgot">Forgotten Unlock Combination</Button>
                 </div>
             )
@@ -345,13 +340,13 @@ export default function AuthenticateComponent({
         }
     }
 
-    if (authenticated) {
+    if (localStorage.getItem('authenticated')) {
         window.location.href = "/dashboard"
-    } else if (!username || !localStorage.getItem("exists")) {
+    } else if (!username) {
         window.location.href = "/"
-    } else if (localStorage.getItem("exists") === 'true' && window.location.pathname === "/register") {
+    } else if (localStorage.getItem('exists') === 'true' && window.location.pathname === "/register" && !localStorage.getItem('authenticated')) {
         window.location.href = "/login"
-    } else if (localStorage.getItem("exists") === 'false' && window.location.pathname === "/login") {
+    } else if (localStorage.getItem('exists') === 'false' && window.location.pathname === "/login" && !localStorage.getItem('authenticated')) {
         window.location.href = "/register"
     } else {
         if (navigator.mediaDevices.getUserMedia !== null) {
@@ -392,9 +387,5 @@ export default function AuthenticateComponent({
 
 AuthenticateComponent.propTypes = {
     username: PropTypes.string,
-    userExists: PropTypes.bool,
-    setUserExists: PropTypes.func,
-    authenticated: PropTypes.bool,
-    setAuthenticated: PropTypes.func,
     registering: PropTypes.bool.isRequired
 }

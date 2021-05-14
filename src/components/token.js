@@ -19,44 +19,6 @@ export function UsernameToken() {
     }
 }
 
-export function UserExistsToken() {
-    const getUserExists = () => {
-        const existsToken = JSON.parse(localStorage.getItem('exists'))
-        return existsToken
-    }
-
-    const [exists, setUserExists] = useState(getUserExists())
-
-    const saveUserExists = existsToken => {
-        localStorage.setItem('exists', JSON.stringify(existsToken))
-        setUserExists(existsToken)
-    }
-
-    return {
-        setUserExists: saveUserExists,
-        exists
-    }
-}
-
-export function AuthenticatedToken() {
-    const getAuthenticated = () => {
-        const authToken = JSON.parse(localStorage.getItem('authenticated'))
-        return authToken
-    }
-
-    const [authenticated, setAuthenticated] = useState(getAuthenticated())
-
-    const saveAuthenticated = authToken => {
-        localStorage.setItem('authenticated', JSON.stringify(authToken))
-        setAuthenticated(authToken)
-    }
-
-    return {
-        setAuthenticated: saveAuthenticated,
-        authenticated
-    }
-}
-
 export function ClearToken(tokenName) {
     localStorage.removeItem(tokenName)
 }

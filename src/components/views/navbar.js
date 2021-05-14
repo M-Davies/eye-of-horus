@@ -11,7 +11,7 @@ function profileText(username, authenticated) {
             <Nav.Item id="nav_user">Not Signed In</Nav.Item>
         )
     } else {
-        if (authenticated === true) {
+        if (authenticated === 'true') {
             return (
                 <Nav.Item id="nav_user">Logged in as: {username}</Nav.Item>
             )
@@ -43,7 +43,7 @@ export default class NavbarComponent extends Component {
                     </Navbar.Collapse>
                     <Navbar.Collapse className="justify-content-end">
                         <Nav className="auto">
-                            {profileText(this.props.username, this.props.authenticated)}
+                            {profileText(this.props.username, localStorage.getItem('authenticated'))}
                         </Nav>
                     </Navbar.Collapse>
                 </Navbar>
@@ -53,11 +53,9 @@ export default class NavbarComponent extends Component {
 }
 
 NavbarComponent.propTypes = {
-    username: PropTypes.string,
-    authenticated: PropTypes.bool
+    username: PropTypes.string
 }
 
 NavbarComponent.defaultProps = {
-    username: null,
-    authenticated: false
+    username: null
 }
